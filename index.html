@@ -1,0 +1,3043 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ESP32 OV2460 — Light UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+                <style>
+      :root{
+        --page-bg: #f6f8fa;
+        --panel: #ffffff;
+        --muted: #6b7280;
+        --text: #0f1724;
+        --accent: #0ea5a4; /* teal */
+        --accent-2: #06b6d4;
+        --muted-border: rgba(15,23,42,0.06);
+        --radius: 12px;
+      }
+      *{box-sizing:border-box}
+html,body {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+  font-size: 15px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+/* Layout */
+.app-overlay {
+  width: min(100%, 1400px);
+  max-width: 100%;
+  margin: 20px auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+@media (max-width: 1024px) {
+  .app-overlay {
+    grid-template-columns: 1fr;
+  }
+}
+.left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.left-col.door-panel {
+  grid-column: 1 / -1;
+}
+.right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.tab-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.65);
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+}
+.tab-button {
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+.tab-button.active {
+  background: linear-gradient(90deg,var(--accent),var(--accent-2));
+  color: #fff;
+}
+.sensor-panel {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.settings-panel {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.settings-panel nav#menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.settings-panel nav#menu > .card {
+  height: fit-content;
+}
+.toggle-row{display:flex;align-items:center;gap:10px}
+.toggle-switch{position:relative;display:inline-flex;width:58px;height:32px;flex:0 0 auto}
+.toggle-switch input{display:none}
+.toggle-switch span{position:absolute;inset:0;border-radius:999px;background:#e2e8f0;border:1px solid rgba(15,23,42,.08);transition:background .2s ease,box-shadow .2s ease;box-shadow:inset 0 1px 2px rgba(15,23,42,.08)}
+.toggle-switch span:before{content:'';position:absolute;width:24px;height:24px;left:4px;top:3px;border-radius:999px;background:#fff;box-shadow:0 4px 10px rgba(15,23,42,.16);transition:transform .2s ease}
+.toggle-switch input:checked + span{background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 8px 18px rgba(14,165,164,.18)}
+.toggle-switch input:checked + span:before{transform:translateX(26px)}
+.switch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:20px}
+.switch-item{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-radius:14px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid var(--muted-border)}
+.switch-item label:first-child{color:var(--muted);font-weight:700;font-size:13px}
+.sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+header.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+      .brand{display:flex;align-items:center;gap:14px}
+      .logo-badge{
+        width:42px;height:42px;border-radius:10px;
+        background:linear-gradient(135deg,var(--accent),var(--accent-2));
+        display:flex;align-items:center;justify-content:center;font-weight:700;color:white;
+        font-size: 11px;
+        box-shadow:0 8px 20px rgba(14,165,164,0.14)
+      }
+      .title h1{font-size:16px;margin:0;color:var(--text)}
+      .title p{margin:0;color:var(--muted);font-size:12px}
+      .settings-gear{width:40px;height:40px;border-radius:14px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:rgba(14,165,164,.1);color:var(--accent);border:1px solid rgba(14,165,164,.18);box-shadow:none}
+      .settings-gear.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 12px 26px rgba(14,165,164,.18)}
+      .settings-gear svg{width:19px;height:19px}
+
+      /* Sidebar/Panel inside Overlay */
+      nav#menu {
+        display:flex;flex-direction:column;gap:12px;
+      }
+
+      .card{
+        background: rgba(255,255,255,0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding:14px;
+        border-radius:16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.04); 
+        border:1px solid rgba(255,255,255,0.5);
+        min-width:0;
+        max-width:100%;
+      }
+      .card h3{margin:0 0 8px 0;font-size:13px;color:var(--muted)}
+
+      .input-group{
+        display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);margin: 4px 0;
+        border:1px solid var(--muted-border);
+        min-width:0;
+        max-width:100%;
+      }
+       .input-group.full{
+        width: 100%;
+       } 
+      .input-group label:not(.slider, .toggle-switch){min-width:130px;color:var(--muted);font-weight:600;font-size:13px}
+      .input-group .text{flex:1}
+      .input-group input[type=text], .input-group select{
+        width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);
+        background:#fbfdff;color:var(--text);font-size:14px;
+      }
+
+      /* Range */
+      input[type=range]{-webkit-appearance:none;width:100%;height:10px;background:transparent}
+      input[type=range]::-webkit-slider-runnable-track{height:8px;background:linear-gradient(90deg, rgba(14,165,164,0.2), rgba(6,182,212,0.12));border-radius:8px}
+      input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;margin-top:-6px;width:18px;height:18px;border-radius:50%;background:var(--accent);box-shadow:0 6px 14px rgba(14,165,164,0.18);border:3px solid #fff}
+
+      .range-min,.range-max{color:var(--muted);font-size:13px;width:44px;text-align:center}
+      .input-group:has(input[type=range]){
+        display:grid;
+        grid-template-columns:minmax(34px,max-content) minmax(0,1fr) minmax(34px,max-content) auto;
+        align-items:center;
+        column-gap:10px;
+        row-gap:8px;
+      }
+      .input-group:has(input[type=range]) > label:not(.slider,.toggle-switch){
+        grid-column:1 / -1;
+        min-width:0;
+        width:100%;
+      }
+      .input-group:has(input[type=range]) > input[type=range]{
+        grid-column:2;
+        min-width:0;
+      }
+      .input-group:has(input[type=range]) > .range-min{grid-column:1;grid-row:2}
+      .input-group:has(input[type=range]) > .range-max{grid-column:3;grid-row:2}
+      .input-group:has(input[type=range]) > span{grid-column:4;grid-row:2}
+
+      /* Switch */
+      .switch{display:inline-flex;align-items:center;margin-left: auto;}
+      .switch input{display:none}
+      .slider{width:56px;height:30px;border-radius:30px;background:#eef2f7;position:relative;border:1px solid rgba(15,23,42,0.04)}
+      .slider:before{content:'';position:absolute;left:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .22s;box-shadow:0 4px 10px rgba(2,6,23,0.06)}
+      .switch input:checked + .slider{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+      .switch input:checked + .slider:before{transform:translateX(26px)}
+
+      /* Buttons */
+      button, .button{cursor:pointer;padding:9px 14px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;font-weight:600;box-shadow:0 8px 20px rgba(14,165,164,0.12)}
+      button.ghost{background:transparent;border:1px solid rgba(15,23,42,0.06);color:var(--text);padding:8px 12px}
+      button.inline-button{padding:8px 10px;background:transparent;border:1px solid rgba(15,23,42,0.04);color:var(--accent)}
+
+      /* Viewer in Overlay */
+      figure { margin: 0; }
+      .viewer-top{display:flex;justify-content:space-between;align-items:center;gap:10px; margin-bottom: 10px;}
+      .viewer-top .status{font-size:13px;color:var(--muted)}
+      .image-container{position:relative;border-radius:12px;overflow:hidden;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;min-height:220px;border:1px dashed rgba(15,23,42,0.1)}
+      .image-container img{width:100%;height:auto;display:block;object-fit:contain;max-height: 80vh; border-radius: 8px;}
+
+      .save{position:absolute;left:8px;top:8px;background:var(--accent);padding:5px 8px;border-radius:8px;color:white;text-decoration:none;font-size:12px;}
+      .close{position:absolute;right:8px;top:8px;background:#ef4444;padding:5px 8px;border-radius:8px;color:white;cursor:pointer;font-size:12px;}
+
+      /* Responsive */
+      
+
+      .gauges-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px; margin-bottom: 16px; }
+      .gauge-card { background: white; border-radius: 12px; padding: 12px 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+      .gauge-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+      .gauge-container { position: relative; width: 90px; height: 90px; margin: 0 auto; }
+      .gauge-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+      .gauge-bg { fill: none; stroke: #e2e8f0; stroke-width: 8; }
+      .gauge-val { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease, stroke 0.5s ease; stroke-dasharray: 226; stroke-dashoffset: 226; }
+      .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 18px; font-weight: 700; color: var(--text); display: flex; flex-direction: column; line-height: 1.1; }
+      .gauge-unit { font-size: 10px; color: var(--muted); font-weight: 600; }
+      .chart-wrap{height:260px;position:relative;padding:12px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(248,250,252,.78));border:1px solid rgba(15,23,42,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.8);width:100%;max-width:100%;min-width:0;overflow:hidden}
+      .chart-wrap canvas{display:block;width:100%!important;max-width:100%;height:100%!important}
+      .chart-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+      .legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+      .radar-debug-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+      .radar-debug-card{padding:14px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(248,250,252,.78));border:1px solid rgba(15,23,42,.06);min-width:0}
+      .radar-debug-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+      .radar-debug-title{font-size:13px;font-weight:800;color:var(--text)}
+      .radar-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(148,163,184,.14);color:var(--muted);font-size:11px;font-weight:800}
+      .radar-pill.ok{background:rgba(16,185,129,.15);color:#047857}
+      .radar-debug-card canvas{display:block;width:100%;height:190px}
+      .radar-bars{display:grid;gap:8px}
+      .radar-bar-row{display:grid;grid-template-columns:34px 1fr 36px;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+      .radar-bar-track{height:9px;border-radius:999px;background:#e7f7f8;overflow:hidden}
+      .radar-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#14b8a6,#60a5fa)}
+      .radar-sensitivity-grid{display:grid;grid-template-columns:repeat(9,minmax(76px,1fr));gap:8px;overflow-x:auto;padding-bottom:4px}
+      .radar-gate-control{padding:10px;border-radius:14px;background:rgba(255,255,255,.82);border:1px solid rgba(15,23,42,.06);min-width:76px}
+      .radar-gate-label{font-size:12px;font-weight:900;color:var(--text);margin-bottom:8px}
+      .radar-gate-control label{display:block;font-size:10px;color:var(--muted);font-weight:800;margin:7px 0 4px}
+      .radar-gate-control input[type=range]{width:100%;margin:0}
+      .radar-gate-value{font-size:11px;font-weight:900;color:var(--accent);text-align:right;margin-top:2px}
+      .role-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+      .role-option{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid rgba(15,23,42,.08);border-radius:10px;background:#fbfdff;color:var(--text);font-size:13px;font-weight:600}
+      .role-option input{accent-color:var(--accent)}
+      #faces-table tbody tr.face-row{cursor:pointer;transition:background .18s ease, box-shadow .18s ease}
+      #faces-table tbody tr.face-ok{background:rgba(16,185,129,.14)}
+      #faces-table tbody tr.face-locked{background:rgba(239,68,68,.22);box-shadow:inset 4px 0 0 rgba(239,68,68,.85)}
+      #faces-table tbody tr.face-locked:hover{background:rgba(239,68,68,.32)}
+      .lock-pill{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}
+      .lock-pill.ok{background:rgba(16,185,129,.16);color:#047857}
+      .lock-pill.locked{background:rgba(239,68,68,.16);color:#b91c1c}
+      .history-panel{grid-column:1/-1;display:flex;flex-direction:column;gap:18px;min-width:0}
+      .history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:18px;background:linear-gradient(90deg,#0f766e,#14b8a6);color:#fff;box-shadow:0 18px 40px rgba(15,118,110,.18)}
+      .history-title{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:800;letter-spacing:.02em}
+      .history-nav{width:38px;height:38px;border-radius:999px;background:rgba(255,255,255,.94);color:#0f766e;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:22px;box-shadow:none}
+      .history-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+      .history-controls select{padding:10px 12px;border-radius:8px;border:0;background:#fff;color:var(--text);font-weight:700}
+      .calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid rgba(15,23,42,.08);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.72)}
+      .calendar-weekday{padding:12px 8px;text-align:center;color:var(--muted);font-weight:700;background:rgba(255,255,255,.86);border-bottom:1px solid rgba(15,23,42,.08)}
+      .calendar-day{min-height:106px;padding:12px;border-right:1px solid rgba(15,23,42,.07);border-bottom:1px solid rgba(15,23,42,.07);background:rgba(255,255,255,.5);cursor:pointer;position:relative;transition:background .18s ease,transform .18s ease}
+      .calendar-day:nth-child(7n){border-right:0}
+      .calendar-day:hover{background:rgba(20,184,166,.1);transform:translateY(-1px)}
+      .calendar-day.other-month{color:#94a3b8;background:rgba(248,250,252,.55)}
+      .calendar-day.selected{background:rgba(20,184,166,.18);box-shadow:inset 0 0 0 2px rgba(20,184,166,.65)}
+      .calendar-day-number{font-size:28px;font-weight:800;line-height:1}
+      .calendar-day.weekend .calendar-day-number{color:#dc2626}
+      .calendar-dot{position:absolute;right:12px;top:14px;width:7px;height:7px;border-radius:999px;background:#22c55e}
+      .calendar-count{position:absolute;right:10px;bottom:10px;padding:3px 8px;border-radius:999px;background:rgba(14,165,164,.12);color:#0f766e;font-size:12px;font-weight:800}
+      .gantt-card{overflow:hidden}
+      .gantt-wrap{overflow:auto;border-radius:16px;border:1px solid rgba(15,23,42,.08);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(248,250,252,.82))}
+      .gantt-grid{min-width:980px;display:grid;grid-template-columns:150px repeat(24,1fr);font-size:12px}
+      .gantt-head,.gantt-name,.gantt-cell{min-height:34px;border-right:1px solid rgba(15,23,42,.06);border-bottom:1px solid rgba(15,23,42,.06);display:flex;align-items:center}
+      .gantt-head{justify-content:center;background:#eef2f7;color:#64748b;font-weight:800;position:sticky;top:0;z-index:1}
+      .gantt-name{padding:0 10px;font-weight:800;color:#475569;background:rgba(255,255,255,.72);position:sticky;left:0;z-index:2}
+      .gantt-row{display:contents}
+      .gantt-lane{grid-column:2/26;position:relative;min-height:38px;border-bottom:1px solid rgba(15,23,42,.06);background:repeating-linear-gradient(90deg,rgba(226,232,240,.46) 0,rgba(226,232,240,.46) calc(100% / 24),rgba(248,250,252,.56) calc(100% / 24),rgba(248,250,252,.56) calc(100% / 12))}
+      .gantt-bar{position:absolute;top:8px;height:22px;border-radius:5px;background:linear-gradient(90deg,#f97316,#14b8a6);box-shadow:0 8px 16px rgba(15,23,42,.12);color:#111827;font-weight:900;font-size:11px;display:flex;align-items:center;justify-content:center;white-space:nowrap;min-width:22px}
+      .gantt-empty{padding:18px;color:var(--muted);font-weight:700}
+      .header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+      .time-badge{padding:8px 14px;border-radius:999px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(15,23,42,.08);color:var(--text);font-size:13px;font-weight:800;box-shadow:0 8px 20px rgba(15,23,42,.06);min-width:126px;text-align:center}
+      .logout-button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:#ef4444;border:1px solid rgba(239,68,68,.22);background:rgba(255,255,255,.72);padding:9px 16px;border-radius:999px;font-weight:800;box-shadow:0 8px 20px rgba(239,68,68,.08);transition:transform .18s ease,background .18s ease,box-shadow .18s ease}
+      .logout-button:hover{background:rgba(239,68,68,.08);transform:translateY(-1px);box-shadow:0 12px 26px rgba(239,68,68,.14)}
+      
+      .hidden{display:none!important}
+
+      /* ===== Phone Camera Popup & View ===== */
+      .popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:9999}
+      .popup-card{background:white;border-radius:20px;padding:28px 24px;min-width:280px;max-width:340px;box-shadow:0 24px 48px rgba(0,0,0,0.18);text-align:center}
+      .popup-card h3{margin:0 0 18px 0;font-size:17px;color:var(--text)}
+      .popup-card button{display:block;width:100%;margin-bottom:10px;padding:14px;font-size:15px;border-radius:12px}
+      .popup-card button.ghost{margin-bottom:0}
+      .app-modal-overlay{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.46);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:modalFade .18s ease-out}
+      .app-modal-card{width:min(430px,100%);border-radius:24px;padding:26px;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.96));box-shadow:0 28px 70px rgba(15,23,42,.28),0 0 0 1px rgba(255,255,255,.7);text-align:center;animation:modalPop .2s cubic-bezier(.2,.9,.2,1)}
+      .app-modal-card h3{margin:0 0 10px;color:var(--text);font-size:20px}
+      .app-modal-card p{margin:0 0 20px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
+      .app-modal-actions{display:grid;gap:10px}
+      .app-modal-actions.two{grid-template-columns:1fr 1fr}
+      .app-modal-actions button{margin:0;padding:13px 16px;font-size:15px}
+      .app-modal-actions .danger{background:linear-gradient(90deg,#ef4444,#f97316)}
+      .log-toast-stack{position:fixed;right:18px;bottom:18px;z-index:11000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 24px))}
+      .log-toast{position:relative;padding:14px 42px 14px 16px;border-radius:18px;background:rgba(255,255,255,.96);border:1px solid rgba(15,23,42,.08);box-shadow:0 18px 46px rgba(15,23,42,.18);animation:toastIn .16s cubic-bezier(.2,.9,.2,1);color:var(--text);opacity:1;transform:translateY(0) scale(1);transition:opacity .9s ease,transform .9s ease}
+      .log-toast.is-fading{opacity:0;transform:translateY(8px) scale(.98)}
+      .log-toast-close{position:absolute;right:10px;top:10px;width:24px;height:24px;border-radius:999px;border:0;background:rgba(15,23,42,.06);color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:none;font-size:16px;line-height:1}
+      .log-toast-close:hover{background:rgba(239,68,68,.12);color:#ef4444;transform:none}
+      .log-toast strong{display:block;font-size:13px;margin-bottom:4px;color:var(--accent)}
+      .log-toast span{display:block;font-size:13px;color:var(--muted);line-height:1.35}
+      .app-modal-actions .secondary{background:#f8fafc;color:var(--text);border:1px solid rgba(15,23,42,.08);box-shadow:none}
+      @keyframes modalFade{from{opacity:0}to{opacity:1}}
+      @keyframes modalPop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+      @keyframes riseIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes toastIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+      .card,.app-header,.tab-bar{animation:riseIn .42s ease both}
+      button,.button,.tab-button,.role-option{transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+      button:hover,.button:hover,.tab-button:hover{transform:translateY(-1px)}
+      #phone-cam-container{flex-direction:column;padding:0;overflow:hidden;position:relative}
+      #phone-cam-container video{width:100%;height:auto;display:block;border-radius:8px}
+      #phone-cam-container canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+      .phone-controls{display:flex;gap:8px;padding:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+      .phone-controls button{flex:none}
+      #phone-face-status{text-align:center;padding:8px;font-size:13px;font-weight:600;color:var(--accent);background:rgba(14,165,164,0.06);border-radius:0 0 8px 8px}
+      #phone-enroll-name{width:calc(100% - 20px);margin:0 10px 10px 10px;padding:10px;border-radius:10px;border:1px solid rgba(15,23,42,0.1);font-size:14px;background:#fbfdff}
+      @media (max-width: 720px) {
+        .app-overlay{margin:8px auto;padding:0 8px;gap:12px}
+        header.app-header{padding:12px;flex-wrap:wrap}
+        .tab-bar{overflow-x:auto}
+        .viewer-top{flex-direction:column;align-items:stretch}
+        .viewer-top > div{display:grid!important;grid-template-columns:1fr;gap:8px!important}
+        .input-group{flex-wrap:wrap}
+        .input-group label:not(.slider){min-width:100%;width:100%}
+        .input-group:has(input[type=range]){
+          grid-template-columns:minmax(28px,max-content) minmax(0,1fr) minmax(28px,max-content) auto;
+        }
+        .input-group:has(input[type=range]) > label:not(.slider,.toggle-switch){
+          min-width:0;
+          width:100%;
+        }
+        .input-group:has(input[type=range]) > .range-min,
+        .input-group:has(input[type=range]) > .range-max{
+          width:auto;
+          min-width:28px;
+        }
+        .role-options{grid-template-columns:1fr}
+        .sensor-grid{grid-template-columns:1fr}
+        .gauges-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+        .gauge-container{width:76px;height:76px}
+        .radar-debug-grid{grid-template-columns:1fr}
+        .radar-sensitivity-grid{grid-template-columns:repeat(3,minmax(76px,1fr))}
+        .history-title{font-size:18px}
+        .calendar-day{min-height:76px;padding:8px}
+        .calendar-day-number{font-size:22px}
+        .calendar-weekday{font-size:12px;padding:9px 4px}
+        .popup-card{width:calc(100vw - 28px);min-width:0}
+        .log-toast-stack{right:12px;left:12px;bottom:12px;max-width:none}
+      }
+      
+    </style>
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  </head>
+  <body>
+    
+    <!-- UI Overlay (Glassmorphism Sidebar) -->
+    <div class="app-overlay">
+      <header class="app-header">
+        <div class="brand">
+          <div class="logo-badge">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div class="title">
+            <h1>Door Security</h1>
+            <p>Admin Dashboard</p>
+          </div>
+          <button id="settings-gear" class="settings-gear" type="button" title="Cài đặt" onclick="switchDashboardTab('settings')" aria-label="Cài đặt">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 1 1-2.98 2.98l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.66V21a2.1 2.1 0 1 1-4.2 0v-.06A1.8 1.8 0 0 0 8.4 19.3a1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.98-2.98l.04-.04A1.8 1.8 0 0 0 3.8 14.7 1.8 1.8 0 0 0 2.14 13H2a2.1 2.1 0 1 1 0-4.2h.06A1.8 1.8 0 0 0 3.7 7.7a1.8 1.8 0 0 0-.36-1.98l-.04-.04A2.1 2.1 0 1 1 6.28 2.7l.04.04A1.8 1.8 0 0 0 8.3 3.1 1.8 1.8 0 0 0 9.4 1.44V1.4a2.1 2.1 0 1 1 4.2 0v.06a1.8 1.8 0 0 0 1.1 1.64 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.98 2.98l-.04.04a1.8 1.8 0 0 0-.36 1.98 1.8 1.8 0 0 0 1.66 1.1H21a2.1 2.1 0 1 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15z"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="door-badge-container" style="display:flex;align-items:center;">
+          <div id="door-status-badge" style="padding:6px 16px;border-radius:30px;font-size:13px;font-weight:700;color:white;background:#94a3b8;transition:all 0.3s;box-shadow:0 4px 10px rgba(0,0,0,0.1);margin-left:20px;">
+            ⏳ Đang kết nối cửa...
+          </div>
+        </div>
+        <div class="header-actions">
+          <div id="header-time-badge" class="time-badge">Đang update...</div>
+          <a href="/logout" class="logout-button" onclick="return handleLogout(event);">Đăng xuất</a>
+        </div>
+      </header>
+      <div class="tab-bar" role="tablist" aria-label="Dashboard sections">
+        <button class="tab-button active" id="tab-door" type="button" onclick="switchDashboardTab('door')">Cửa</button>
+        <button class="tab-button" id="tab-sensors" type="button" onclick="switchDashboardTab('sensors')">Cảm biến & thiết bị</button>
+        <button class="tab-button" id="tab-history" type="button" onclick="switchDashboardTab('history')">Lịch sử mở cửa</button>
+      </div>
+      <div class="left-col tab-panel door-panel">
+        <figure style="margin:0">
+        <div class="card">
+          <div class="viewer-top">
+            <strong>Stream Camera</strong>
+            <div style="display:flex;gap:4px">
+              <button id="face_enroll" class="inline-button">Đăng ký khuôn mặt</button>
+            </div>
+          </div>
+          <div id="stream-container" class="image-container hidden">
+            <a id="save-still" href="#" class="button save" download="capture.jpg">Lưu</a>
+            <div class="close" id="close-stream">×</div>
+            <img id="stream" src="" crossorigin="anonymous" alt="Camera stream">
+          </div>
+          <!-- Phone Camera Container -->
+          <div id="phone-cam-container" class="image-container hidden">
+            <div class="close" id="close-phone-cam">×</div>
+            <video id="phone-video" autoplay playsinline muted></video>
+            <canvas id="phone-overlay"></canvas>
+            <div id="phone-face-status">📱 Đang khởi tạo camera...</div>
+            <div class="phone-controls">
+              <button id="phone-capture-btn" disabled>📸 Đang chờ khuôn mặt...</button>
+              <button id="phone-close-btn" class="ghost">Đóng Camera</button>
+            </div>
+          </div>
+        </div>
+      </figure>
+        <div class="card" id="events-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Nhật ký mở cửa (Event Log)</h3>
+            <button onclick="clearLogs()" style="background:#ef4444;color:white;padding:4px 8px;font-size:12px;border-radius:6px;">Xóa lịch sử</button>
+          </div>
+          <div class="input-group full" style="flex-direction:column;gap:8px;overflow:auto;max-height:240px;">
+            <table id="event-table" style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
+              <thead>
+                <tr style="color:var(--muted);border-bottom:1px solid #ddd;">
+                  <th style="padding:6px;">Thời gian</th>
+                  <th style="padding:6px;">Sự kiện</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="faces-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Quản lý Khuôn mặt</h3>
+            <button onclick="fetchFaces()" style="background:var(--accent);color:white;padding:4px 8px;font-size:12px;border-radius:6px;">Tải lại</button>
+          </div>
+          <div class="input-group full" style="flex-direction:column;gap:8px;overflow:auto;max-height:240px;">
+            <table id="faces-table" style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
+              <thead>
+                <tr style="color:var(--muted);border-bottom:1px solid #ddd;">
+                  <th style="padding:6px;">ID</th>
+                  <th style="padding:6px;">Tên</th>
+                  <th style="padding:6px;">Chức vụ</th>
+                  <th style="padding:6px;">RFID</th>
+                  <th style="padding:6px;">Ngày thêm</th>
+                  <th style="padding:6px;">Trạng thái</th>
+                  <th style="padding:6px;">Xóa</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="occupants-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Danh sách số người trong phòng</h3>
+            <button onclick="fetchOccupants()" style="background:var(--accent);color:white;padding:4px 8px;font-size:12px;border-radius:6px;">Tải lại</button>
+          </div>
+          <div class="input-group full" style="flex-direction:column;gap:8px;overflow:auto;max-height:240px;">
+            <table id="occupants-table" style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
+              <thead>
+                <tr style="color:var(--muted);border-bottom:1px solid #ddd;">
+                  <th style="padding:6px;">ID</th>
+                  <th style="padding:6px;">Tên</th>
+                  <th style="padding:6px;">Chức vụ</th>
+                  <th style="padding:6px;">Giờ vào</th>
+                  <th style="padding:6px;">Thời gian</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="face-info-card">
+          <h3>Cập nhật thông tin</h3>
+          <div class="input-group full">
+            <label style="min-width:60px">ID</label>
+            <input id="face-id-input" type="number" placeholder="VD: 0">
+          </div>
+          <div class="input-group full">
+            <label style="min-width:60px">Tên</label>
+            <input id="face-name-input" type="text" placeholder="VD: Chi Kien">
+          </div>
+          <div class="input-group full">
+            <label style="min-width:60px">RFID</label>
+            <input id="face-rfid-input" type="text" placeholder="VD: 04:A3:2B:1C">
+          </div>
+          <div class="input-group full" style="align-items:flex-start;">
+            <label style="min-width:60px">Chức vụ</label>
+            <div class="role-options" id="face-role-group">
+              <label class="role-option"><input type="checkbox" name="face-role" value="Thủ kho"> Thủ kho</label>
+              <label class="role-option"><input type="checkbox" name="face-role" value="Nhân viên"> Nhân viên</label>
+              <label class="role-option"><input type="checkbox" name="face-role" value="Bảo vệ"> Bảo vệ</label>
+              <label class="role-option"><input type="checkbox" name="face-role" value="Khách" checked> Khách</label>
+            </div>
+          </div>
+          <div class="input-group full">
+             <button onclick="setFaceName()">Lưu thông tin</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="sensor-panel tab-panel hidden">
+        <!-- Sensor Gauges Grid -->
+        <div class="gauges-grid">
+          <!-- Temp Gauge -->
+          <div class="gauge-card" id="temp-card">
+            <div class="gauge-title">🌡️ Nhiệt độ</div>
+            <div class="gauge-container">
+              <svg class="gauge-svg" viewBox="0 0 80 80">
+                <circle class="gauge-bg" cx="40" cy="40" r="36"></circle>
+                <circle class="gauge-val" id="temp-gauge-val" cx="40" cy="40" r="36" stroke="#ef4444"></circle>
+              </svg>
+              <div class="gauge-text"><span id="temp-value">--</span><span class="gauge-unit">°C</span></div>
+            </div>
+          </div>
+          <!-- Hum Gauge -->
+          <div class="gauge-card" id="hum-card">
+            <div class="gauge-title">💧 Độ ẩm</div>
+            <div class="gauge-container">
+              <svg class="gauge-svg" viewBox="0 0 80 80">
+                <circle class="gauge-bg" cx="40" cy="40" r="36"></circle>
+                <circle class="gauge-val" id="hum-gauge-val" cx="40" cy="40" r="36" stroke="#3b82f6"></circle>
+              </svg>
+              <div class="gauge-text"><span id="hum-value">--</span><span class="gauge-unit">%</span></div>
+            </div>
+          </div>
+          <!-- Smoke Gauge -->
+          <div class="gauge-card" id="smoke-card">
+            <div class="gauge-title">🔥 Khói (MQ2)</div>
+            <div class="gauge-container">
+              <svg class="gauge-svg" viewBox="0 0 80 80">
+                <circle class="gauge-bg" cx="40" cy="40" r="36"></circle>
+                <circle class="gauge-val" id="smoke-gauge-val" cx="40" cy="40" r="36" stroke="#8b5cf6"></circle>
+              </svg>
+              <div class="gauge-text"><span id="mq2-value">--</span><span class="gauge-unit" id="smoke-status">An toàn</span></div>
+            </div>
+          </div>
+
+        </div>
+
+
+
+        <div class="card" id="sensor-history-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <h3>Lịch sử nhiệt độ / độ ẩm / khói</h3>
+            <span style="font-size:12px;color:var(--muted);">Cập nhật mỗi 3 giây, lưu 60 điểm gần nhất trên trình duyệt</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="sensor-history-chart"></canvas>
+          </div>
+          <div class="chart-legend">
+            <span><i class="legend-dot" style="background:#ef4444"></i>Nhiệt độ</span>
+            <span><i class="legend-dot" style="background:#3b82f6"></i>Độ ẩm</span>
+            <span><i class="legend-dot" style="background:#8b5cf6"></i>Khói MQ2</span>
+          </div>
+        </div>
+
+        <!-- LD2410 Radar Card -->
+        <div class="card" id="radar-card">
+          <h3>📡 Radar mmWave (LD2410)</h3>
+          <div class="input-group full" style="justify-content:center;gap:24px;flex-wrap:wrap;">
+            <div style="text-align:center;">
+              <div id="presence-status" style="font-size:18px;font-weight:700;">--</div>
+              <div style="color:var(--muted);font-size:12px;">Phát hiện người</div>
+            </div>
+            <div style="text-align:center;">
+              <div id="presence-distance" style="font-size:28px;font-weight:700;color:var(--accent);">-- cm</div>
+              <div style="color:var(--muted);font-size:12px;">Khoảng cách</div>
+            </div>
+            <div style="text-align:center;">
+              <div id="occupant-count" style="font-size:28px;font-weight:700;color:var(--accent-2);">0</div>
+              <div style="color:var(--muted);font-size:12px;">Số người trong phòng</div>
+            </div>
+          </div>
+          <div class="radar-debug-head" style="margin-top:14px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span class="radar-pill" id="ld2410-engineering-pill">Engineering: --</span>
+              <span class="radar-pill" id="ld2410-config-pill">Config: --</span>
+            </div>
+            <button type="button" onclick="refreshLd2410Config()">Đọc lại ngưỡng</button>
+          </div>
+          <div class="radar-debug-grid">
+            <div class="radar-debug-card">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Moving gate energy / sensitivity</span>
+              </div>
+              <canvas id="ld2410-moving-chart"></canvas>
+            </div>
+            <div class="radar-debug-card">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Stationary gate energy / sensitivity</span>
+              </div>
+              <canvas id="ld2410-static-chart"></canvas>
+            </div>
+            <div class="radar-debug-card">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Moving energy [0..8]</span>
+              </div>
+              <div id="ld2410-moving-bars" class="radar-bars"></div>
+            </div>
+            <div class="radar-debug-card">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Stationary energy [0..8]</span>
+              </div>
+              <div id="ld2410-static-bars" class="radar-bars"></div>
+            </div>
+            <div class="radar-debug-card" style="grid-column:1/-1;">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Detection range history</span>
+              </div>
+              <canvas id="ld2410-range-chart"></canvas>
+            </div>
+            <div class="radar-debug-card" style="grid-column:1/-1;">
+              <div class="radar-debug-head">
+                <span class="radar-debug-title">Chỉnh ngưỡng sensitivity từng gate</span>
+                <span style="font-size:12px;color:var(--muted);">M = moving, S = stationary</span>
+              </div>
+              <div id="ld2410-sensitivity-controls" class="radar-sensitivity-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fan Control Card -->
+        <div class="card" id="fan-card">
+          <h3>🌀 Điều Khiển Quạt</h3>
+          <div class="switch-grid">
+            <div class="switch-item">
+              <label>Trạng thái Quạt</label>
+              <label class="toggle-switch" title="Bật/tắt quạt"><input id="fan-toggle-switch" type="checkbox" onchange="toggleFan()"><span></span></label>
+            </div>
+            <div class="switch-item">
+              <label>Chế độ AUTO</label>
+              <label class="toggle-switch" title="Chế độ AUTO quạt"><input id="fan-auto-switch" type="checkbox" onchange="toggleFanAuto()"><span></span></label>
+            </div>
+          </div>
+          <div class="input-group full">
+            <label for="fan-threshold">Ngưỡng độ ẩm (%)</label>
+            <div class="range-min">30</div>
+            <input type="range" id="fan-threshold" min="30" max="95" value="70"
+              oninput="updateThresholdLabel(this.value)"
+              onchange="setFanThreshold(this.value)">
+            <div class="range-max">95</div>
+            <span id="threshold-value" style="min-width:35px;text-align:center;font-weight:600;">70%</span>
+          </div>
+        </div>
+        <div class="card" id="fire-card">
+          <h3>Điều khiển báo cháy</h3>
+          <div class="switch-item" style="margin-bottom:20px;">
+            <label>Chế độ AUTO</label>
+            <label class="toggle-switch" title="Chế độ AUTO báo cháy"><input id="pump-auto-switch" type="checkbox" onchange="togglePumpAuto()"><span></span></label>
+          </div>
+          <div class="input-group full">
+            <label for="smoke-threshold">Ngưỡng % báo cháy</label>
+            <div class="range-min">10</div>
+            <input type="range" id="smoke-threshold" min="10" max="100" value="10"
+              oninput="updateSmokeThresholdLabel(this.value)"
+              onchange="setSmokeThreshold(this.value)">
+            <div class="range-max">100</div>
+            <span id="smoke-threshold-value" style="min-width:35px;text-align:center;font-weight:600;">10%</span>
+          </div>
+        </div>
+      </div>
+      <div class="history-panel tab-panel hidden">
+        <div class="history-toolbar">
+          <div class="history-title">
+            <button class="history-nav" type="button" onclick="changeHistoryMonth(-1)">‹</button>
+            <span id="history-title">THÁNG -- - ----</span>
+            <button class="history-nav" type="button" onclick="changeHistoryMonth(1)">›</button>
+          </div>
+          <div class="history-controls">
+            <select id="history-month"></select>
+            <select id="history-year"></select>
+            <button type="button" onclick="applyHistoryDate()">Xem</button>
+          </div>
+        </div>
+        <div class="card">
+          <div id="history-calendar" class="calendar-grid"></div>
+        </div>
+        <div class="card gantt-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <h3 id="history-gantt-title">Lịch sử ra/vào trong ngày</h3>
+            <span style="font-size:12px;color:var(--muted);">Mỗi hàng là một người, trục ngang chia 1-24 giờ</span>
+          </div>
+          <div id="history-gantt" class="gantt-wrap"></div>
+        </div>
+      </div>
+      <div class="settings-panel tab-panel hidden">
+        <div class="card" style="grid-column:1/-1;">
+          <h3>Cài đặt hệ thống</h3>
+          <div style="color:var(--muted);font-size:13px;line-height:1.45;">
+            Khu vực cấu hình thông số camera, đổi mật khẩu đăng nhập và các tuỳ chọn bảo trì hệ thống.
+          </div>
+        </div>
+
+
+      
+
+      <nav id="menu">
+        <!-- Option -->
+        <div class="card hidden">
+          <div class="input-group full">
+            <label for="xclk">XCLK MHz</label>
+            <div class="text"><input id="xclk" type="text" minlength="1" maxlength="2" size="2" value="20"></div>
+            <button class="inline-button" id="set-xclk">Set</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="input-group full">
+            <label for="framesize">Resolution</label>
+            <select id="framesize" class="default-action">
+              <option value="13">UXGA(1600x1200)</option>
+              <option value="12">SXGA(1280x1024)</option>
+              <option value="11">HD(1280x720)</option>
+              <option value="10">XGA(1024x768)</option>
+              <option value="9">SVGA(800x600)</option>
+              <option value="8">VGA(640x480)</option>
+              <option value="7">HVGA(480x320)</option>
+              <option value="6">CIF(400x296)</option>
+              <option value="5">QVGA(320x240)</option>
+              <option value="4">240x240</option>
+              <option value="3">HQVGA(240x176)</option>
+              <option value="2">QCIF(176x144)</option>
+              <option value="1">QQVGA(160x120)</option>
+              <option value="0">96x96</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Đổi mật khẩu đăng nhập</h3>
+          <div class="input-group full">
+            <input id="passcode" type="text" maxlength="15" placeholder="Nhập mật khẩu mới">
+            <button onclick="setPass()">Đổi</button>
+          </div>
+        </div>
+
+
+
+        <div class="card">
+          <div class="input-group full">
+            <label for="quality">JPEG Quality</label>
+            <div class="range-min">4</div>
+            <input type="range" id="quality" min="4" max="63" value="10" class="default-action">
+            <div class="range-max">63</div>
+          </div>
+
+          <!-- Add name moved back to Door tab; keep this legacy block hidden to preserve layout safety. -->
+          <div class="card hidden">
+          <h3>Cập nhật thông tin</h3>
+          <div class="input-group full">
+            <label style="min-width:60px">ID Số</label>
+            <input id="legacy-face-id-input" type="number" placeholder="VD: 0 (Xem trên cam)">
+          </div>
+          <div class="input-group full">
+            <label style="min-width:60px">Tên</label>
+            <input id="legacy-face-name-input" type="text" placeholder="VD: Chi Kien">
+          </div>
+          <div class="input-group full">
+            <label style="min-width:60px">RFID</label>
+            <input id="legacy-face-rfid-input" type="text" placeholder="VD: 04:A3:2B:1C">
+          </div>
+          <div class="input-group full" style="align-items:flex-start;">
+            <label style="min-width:60px">Chức vụ</label>
+            <div class="role-options" id="legacy-face-role-group">
+              <label class="role-option"><input type="checkbox" name="legacy-face-role" value="Thủ kho"> Thủ kho</label>
+              <label class="role-option"><input type="checkbox" name="legacy-face-role" value="Nhân viên"> Nhân viên</label>
+              <label class="role-option"><input type="checkbox" name="legacy-face-role" value="Bảo vệ"> Bảo vệ</label>
+              <label class="role-option"><input type="checkbox" name="legacy-face-role" value="Khách" checked> Khách</label>
+            </div>
+          </div>
+          <div class="input-group full">
+             <button onclick="setFaceName()">Lưu thông tin</button>
+          </div>
+        </div>
+
+
+
+          <div class="input-group full">
+            <label for="brightness">Brightness</label>
+            <div class="range-min">-2</div>
+            <input type="range" id="brightness" min="-2" max="2" value="0" class="default-action">
+            <div class="range-max">2</div>
+          </div>
+
+          <div class="input-group full">
+            <label for="contrast">Contrast</label>
+            <div class="range-min">-2</div>
+            <input type="range" id="contrast" min="-2" max="2" value="0" class="default-action">
+            <div class="range-max">2</div>
+          </div>
+
+          <div class="input-group full">
+            <label for="saturation">Saturation</label>
+            <div class="range-min">-2</div>
+            <input type="range" id="saturation" min="-2" max="2" value="0" class="default-action">
+            <div class="range-max">2</div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group full hidden">
+            <label for="special_effect">Special Effect</label>
+            <select id="special_effect" class="default-action">
+                <option value="0" selected>No Effect</option>
+                <option value="1">Negative</option>
+                <option value="2">Grayscale</option>
+                <option value="3">Red Tint</option>
+                <option value="4">Green Tint</option>
+                <option value="5">Blue Tint</option>
+                <option value="6">Sepia</option>
+            </select>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="awb">AWB</label>
+            <div class="switch"><input id="awb" type="checkbox" class="default-action" checked><label class="slider" for="awb"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="awb_gain">AWB Gain</label>
+            <div class="switch"><input id="awb_gain" type="checkbox" class="default-action" checked><label class="slider" for="awb_gain"></label></div>
+          </div>
+
+          <div class="input-group full">
+            <label for="wb_mode">WB Mode</label>
+            <select id="wb_mode" class="default-action">
+              <option value="0" selected>Auto</option>
+              <option value="1">Sunny</option>
+              <option value="2">Cloudy</option>
+              <option value="3">Office</option>
+              <option value="4">Home</option>
+            </select>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="aec">AEC SENSOR</label>
+            <div class="switch"><input id="aec" type="checkbox" class="default-action" checked><label class="slider" for="aec"></label></div>
+          </div>
+
+          <!-- Option --> 
+          <div class="input-group hidden">
+            <label for="aec2">AEC DSP</label>
+            <div class="switch"><input id="aec2" type="checkbox" class="default-action" checked><label class="slider" for="aec2"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group full hidden">
+            <label for="ae_level">AE Level</label>
+            <div class="range-min">-2</div>
+            <input type="range" id="ae_level" min="-2" max="2" value="0" class="default-action">
+            <div class="range-max">2</div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group full hidden">
+            <label for="aec_value">Exposure</label>
+            <div class="range-min">0</div>
+            <input type="range" id="aec_value" min="0" max="1200" value="204" class="default-action">
+            <div class="range-max">1200</div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="agc">AGC</label>
+            <div class="switch"><input id="agc" type="checkbox" class="default-action" checked><label class="slider" for="agc"></label></div>
+          </div>
+
+          <div class="input-group hidden" id="agc_gain-group">
+            <label for="agc_gain">Gain</label>
+            <div class="range-min">1x</div>
+            <input type="range" id="agc_gain" min="0" max="30" value="5" class="default-action">
+            <div class="range-max">31x</div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group full hidden">
+            <label for="gainceiling">Gain Ceiling</label>
+            <div class="range-min">2x</div>
+            <input type="range" id="gainceiling" min="0" max="6" value="0" class="default-action">
+            <div class="range-max">128x</div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="bpc">BPC</label>
+            <div class="switch"><input id="bpc" type="checkbox" class="default-action"><label class="slider" for="bpc"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="wpc">WPC</label>
+            <div class="switch"><input id="wpc" type="checkbox" class="default-action" checked><label class="slider" for="wpc"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="raw_gma">Raw GMA</label>
+            <div class="switch"><input id="raw_gma" type="checkbox" class="default-action" checked><label class="slider" for="raw_gma"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="lenc">Lens Correction</label>
+            <div class="switch"><input id="lenc" type="checkbox" class="default-action" checked><label class="slider" for="lenc"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="hmirror">H-Mirror</label>
+            <div class="switch"><input id="hmirror" type="checkbox" class="default-action" checked><label class="slider" for="hmirror"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group">
+            <label for="vflip">V-Flip</label>
+            <div class="switch"><input id="vflip" type="checkbox" class="default-action" checked><label class="slider" for="vflip"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="dcw">DCW (Downsize EN)</label>
+            <div class="switch"><input id="dcw" type="checkbox" class="default-action" checked><label class="slider" for="dcw"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group hidden">
+            <label for="colorbar">Color Bar</label>
+            <div class="switch"><input id="colorbar" type="checkbox" class="default-action"><label class="slider" for="colorbar"></label></div>
+          </div>
+
+          <!-- Option -->
+          <div class="input-group full hidden" id="led-group">
+            <label for="led_intensity">LED Intensity</label>
+            <div class="range-min">0</div>
+            <input type="range" id="led_intensity" min="0" max="255" value="0" class="default-action">
+            <div class="range-max">255</div>
+          </div>
+
+          <div class="input-group full" style="margin-top:20px;">
+            <button onclick="deleteAll()" style="background:#ef4444; color:white; width:100%;">Reset hệ thống</button>
+          </div>
+
+        </div>
+
+        <!-- Option -->
+        <div class="card hidden">
+          <div style="text-align:center;font-weight:600;color:var(--muted)">Advanced Settings</div>
+          <hr style="opacity:0.06;margin:8px 0">
+          <label for="nav-toggle-reg" class="toggle-section-label">Register Get/Set</label>
+          <input type="checkbox" id="nav-toggle-reg" class="hidden toggle-section-button" checked>
+          <section class="toggle-section" style="margin-top:8px">
+            <div class="input-group">
+              <label for="reg-addr">Reg</label>
+              <input id="reg-addr" type="text" minlength="4" maxlength="6" size="6" value="0x111" class="reg-action">
+              <input id="reg-mask" type="text" minlength="4" maxlength="4" size="4" value="0x80" class="reg-action">
+              <input id="reg-value" type="text" minlength="4" maxlength="4" size="4" value="0x80" class="reg-action">
+              <button class="inline-button" id="set-reg">Set</button>
+            </div>
+            <hr style="opacity:0.06;margin:8px 0">
+            <div class="input-group">
+              <label for="get-reg-addr">Get Reg</label>
+              <input id="get-reg-addr" type="text" minlength="4" maxlength="6" size="6" value="0x111">
+              <input id="get-reg-mask" type="text" minlength="4" maxlength="6" size="6" value="0x80">
+              <button class="inline-button" id="get-reg">Get</button>
+            </div>
+            <div class="input-group">
+              <label for="get-reg-value">Value</label>
+              <div class="text"><span id="get-reg-value">0x1234</span></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Additional advanced sections kept -->
+         <div class="card hidden">
+          <label for="nav-toggle-2640pll" class="toggle-section-label">CLK</label>
+          <input type="checkbox" id="nav-toggle-2640pll" class="hidden toggle-section-button" checked>
+          <section class="toggle-section" style="margin-top:8px;">
+            <div class="input-group"><label for="2640pll1">CLK 2X</label><div class="switch"><input id="2640pll1" type="checkbox" class="reg-action" reg="0x111" offset="7" mask="0x01"><label class="slider" for="2640pll1"></label></div></div>
+            <div class="input-group"><label for="2640pll3">CLK DIV</label><div class="text">0<input id="2640pll3" type="text" minlength="1" maxlength="2" size="2" value="1" class="reg-action" reg="0x111" offset="0" mask="0x3f">63</div></div>
+            <div class="input-group"><label for="2640pll5">Auto PCLK</label><div class="switch"><input id="2640pll5" type="checkbox" class="reg-action" reg="0xd3" offset="7" mask="0x01"><label class="slider" for="2640pll5"></label></div></div>
+            <div class="input-group"><label for="2640pll4">PCLK DIV</label><div class="text">0<input id="2640pll4" type="text" minlength="1" maxlength="3" size="3" value="4" class="reg-action" reg="0xd3" offset="0" mask="0x7f">127</div></div>
+          </section>
+          </div>
+
+        <div class="card hidden">
+          <label for="nav-toggle-win" class="toggle-section-label">Window</label>
+          <input type="checkbox" id="nav-toggle-win" class="hidden toggle-section-button" checked>
+          <section class="toggle-section" style="margin-top:8px;">
+            <div class="input-group">
+              <label for="start-x">Sensor Resolution</label>
+              <select id="start-x"><option value="2">CIF (400x296)</option><option value="1">SVGA (800x600)</option><option value="0" selected>UXGA (1600x1200)</option></select>
+            </div>
+            <div class="input-group">
+              <label for="offset-x">Offset</label>
+              <div class="text">X:<input id="offset-x" type="text" minlength="1" maxlength="3" size="6" value="400"></div>
+              <div class="text">Y:<input id="offset-y" type="text" minlength="1" maxlength="3" size="6" value="300"></div>
+            </div>
+            <div class="input-group">
+              <label for="total-x">Window Size</label>
+              <div class="text">X:<input id="total-x" type="text" minlength="1" maxlength="4" size="6" value="800"></div>
+              <div class="text">Y:<input id="total-y" type="text" minlength="1" maxlength="4" size="6" value="600"></div>
+            </div>
+            <div class="input-group">
+              <label for="output-x">Output Size</label>
+              <div class="text">X:<input id="output-x" type="text" minlength="1" maxlength="4" size="6" value="320"></div>
+              <div class="text">Y:<input id="output-y" type="text" minlength="1" maxlength="4" size="6" value="240"></div>
+            </div>
+            <button id="set-resolution" class="inline-button">Set Resolution</button>
+          </section>
+          </div>
+      </nav>
+      </div>
+    </div>
+
+
+
+    <script>
+function showAppModal({ title = 'Thông báo', message = '', confirmText = 'OK', cancelText = '', danger = false } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'app-modal-overlay';
+    const actionsClass = cancelText ? 'app-modal-actions two' : 'app-modal-actions';
+    overlay.innerHTML = `
+      <div class="app-modal-card" role="dialog" aria-modal="true">
+        <h3>${title}</h3>
+        <p>${message}</p>
+        <div class="${actionsClass}">
+          ${cancelText ? `<button class="secondary" data-result="false">${cancelText}</button>` : ''}
+          <button class="${danger ? 'danger' : ''}" data-result="true">${confirmText}</button>
+        </div>
+      </div>`;
+    const close = value => {
+      overlay.remove();
+      resolve(value);
+    };
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay && cancelText) close(false);
+    });
+    overlay.querySelectorAll('button').forEach(btn => {
+      btn.onclick = () => close(btn.dataset.result === 'true');
+    });
+    document.body.appendChild(overlay);
+    const focusBtn = overlay.querySelector('[data-result="true"]');
+    if (focusBtn) focusBtn.focus();
+  });
+}
+
+function appAlert(message, title = 'Thông báo') {
+  return showAppModal({ title, message: String(message), confirmText: 'OK' });
+}
+
+function appConfirm(message, title = 'Xác nhận', danger = false) {
+  return showAppModal({ title, message: String(message), confirmText: 'Đồng ý', cancelText: 'Hủy', danger });
+}
+
+window.alert = message => { appAlert(message); };
+
+let latestEventLogKey = '';
+let eventLogInitialized = false;
+
+function showLogToast(ev) {
+  if (!ev || !ev.actor) return;
+  let stack = document.querySelector('.log-toast-stack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.className = 'log-toast-stack';
+    document.body.appendChild(stack);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'log-toast';
+  const shownTime = String(ev.time || '').startsWith('1970-') ? 'Chưa đồng bộ thời gian' : (ev.time || '');
+  toast.innerHTML = `
+    <button class="log-toast-close" type="button" aria-label="Đóng">×</button>
+    <strong>Nhật ký mở cửa</strong>
+    <span>${shownTime}</span>
+    <span>${ev.actor}</span>`;
+
+  let holdTimer = null;
+  let removeTimer = null;
+  const clearTimers = () => {
+    if (holdTimer) clearTimeout(holdTimer);
+    if (removeTimer) clearTimeout(removeTimer);
+    holdTimer = null;
+    removeTimer = null;
+  };
+  const fadeOut = () => {
+    toast.classList.add('is-fading');
+    removeTimer = setTimeout(() => toast.remove(), 950);
+  };
+  const scheduleFade = () => {
+    clearTimers();
+    holdTimer = setTimeout(fadeOut, 3000);
+  };
+  const restore = () => {
+    clearTimers();
+    toast.classList.remove('is-fading');
+  };
+  const closeNow = () => {
+    clearTimers();
+    toast.classList.add('is-fading');
+    setTimeout(() => toast.remove(), 180);
+  };
+
+  toast.querySelector('.log-toast-close').onclick = closeNow;
+  toast.addEventListener('mouseenter', restore);
+  toast.addEventListener('mouseleave', scheduleFade);
+
+  // Append makes older toasts stay above newer ones in the vertical stack.
+  stack.appendChild(toast);
+  while (stack.children.length > 4) stack.firstElementChild.remove();
+  scheduleFade();
+}
+
+function handleLogout(event) {
+  event.preventDefault();
+  appConfirm('Bạn có chắc muốn đăng xuất?', 'Đăng xuất').then(ok => {
+    if (ok) window.location.href = '/logout';
+  });
+  return false;
+}
+
+// ===== Sensor & Fan Control =====
+const sensorHistory = [];
+const SENSOR_HISTORY_MAX = 60;
+const ld2410RangeHistory = [];
+const LD2410_HISTORY_MAX = 100;
+let ld2410MovingSensitivity = [];
+let ld2410StationarySensitivity = [];
+let ld2410SensitivityDirty = false;
+let doorHistoryLogs = [];
+let historyReady = false;
+const historyState = (() => {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth(), selected: new Date(now.getFullYear(), now.getMonth(), now.getDate()) };
+})();
+let espTimeSynced = false;
+let espTimeOffsetMs = 0;
+let sensorsFetchInFlight = false;
+let ld2410FetchInFlight = false;
+
+function switchDashboardTab(tab) {
+  const showSensors = tab === 'sensors';
+  const showHistory = tab === 'history';
+  const showSettings = tab === 'settings';
+  document.querySelectorAll('.door-panel').forEach(el => el.classList.toggle('hidden', showSensors || showHistory || showSettings));
+  document.querySelectorAll('.sensor-panel').forEach(el => el.classList.toggle('hidden', !showSensors));
+  document.querySelectorAll('.history-panel').forEach(el => el.classList.toggle('hidden', !showHistory));
+  document.querySelectorAll('.settings-panel').forEach(el => el.classList.toggle('hidden', !showSettings));
+  const doorBtn = document.getElementById('tab-door');
+  const sensorsBtn = document.getElementById('tab-sensors');
+  const historyBtn = document.getElementById('tab-history');
+  const settingsBtn = document.getElementById('settings-gear');
+  if (doorBtn) doorBtn.classList.toggle('active', !showSensors && !showHistory && !showSettings);
+  if (sensorsBtn) sensorsBtn.classList.toggle('active', showSensors);
+  if (historyBtn) historyBtn.classList.toggle('active', showHistory);
+  if (settingsBtn) settingsBtn.classList.toggle('active', showSettings);
+  if (showSensors) {
+    fetchSensors();
+    fetchLd2410Debug();
+  }
+  if (showHistory) {
+    initHistoryControls();
+    fetchEvents();
+    renderDoorHistory();
+  }
+}
+
+function fitRadarCanvas(canvas) {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(190 * dpr));
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '190px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: 190 };
+}
+
+function drawLd2410LineChart(canvasId, energy, sensitivity) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const { ctx, w, h } = fitRadarCanvas(canvas);
+  const pad = { l: 30, r: 12, t: 14, b: 24 };
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(15,23,42,.08)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(107,114,128,.9)';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (h - pad.t - pad.b) * i / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.stroke();
+    ctx.fillText(String(100 - i * 25), 4, y + 4);
+  }
+  const draw = (arr, color, width) => {
+    if (!Array.isArray(arr) || arr.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const points = arr.map((v, i) => ({
+      x: pad.l + (w - pad.l - pad.r) * i / Math.max(1, arr.length - 1),
+      y: pad.t + (h - pad.t - pad.b) * (1 - Math.max(0, Math.min(100, Number(v) || 0)) / 100)
+    }));
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const midX = (points[i].x + points[i + 1].x) / 2;
+      const midY = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+    ctx.stroke();
+  };
+  draw(energy, '#2563eb', 3);
+  draw(sensitivity, '#ec4899', 2);
+  ctx.fillStyle = 'rgba(107,114,128,.9)';
+  const gateCount = Math.max(energy?.length || 0, sensitivity?.length || 0);
+  for (let i = 0; i < gateCount; i++) {
+    const x = pad.l + (w - pad.l - pad.r) * i / Math.max(1, gateCount - 1);
+    ctx.fillText(String(i), x - 3, h - 7);
+  }
+}
+
+function drawLd2410HistoryChart() {
+  const canvas = document.getElementById('ld2410-range-chart');
+  if (!canvas) return;
+  const { ctx, w, h } = fitRadarCanvas(canvas);
+  const maxY = Math.max(100, ...ld2410RangeHistory);
+  const pad = { l: 34, r: 12, t: 14, b: 20 };
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(15,23,42,.08)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(107,114,128,.9)';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (h - pad.t - pad.b) * i / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.stroke();
+    ctx.fillText(String(Math.round(maxY - maxY * i / 4)), 4, y + 4);
+  }
+  if (ld2410RangeHistory.length < 2) return;
+  ctx.strokeStyle = '#14b8a6';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ld2410RangeHistory.forEach((v, i) => {
+    const x = pad.l + (w - pad.l - pad.r) * i / Math.max(1, LD2410_HISTORY_MAX - 1);
+    const y = pad.t + (h - pad.t - pad.b) * (1 - Math.max(0, Math.min(maxY, v)) / maxY);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function renderLd2410Bars(id, values) {
+  const el = document.getElementById(id);
+  if (!el || !Array.isArray(values)) return;
+  el.innerHTML = values.map((v, i) => {
+    const pct = Math.max(0, Math.min(100, Number(v) || 0));
+    return `<div class="radar-bar-row"><span>G${i}</span><div class="radar-bar-track"><div class="radar-bar-fill" style="width:${pct}%"></div></div><b>${pct}</b></div>`;
+  }).join('');
+}
+
+function renderLd2410SensitivityControls() {
+  const el = document.getElementById('ld2410-sensitivity-controls');
+  if (!el || !ld2410MovingSensitivity.length || !ld2410StationarySensitivity.length) return;
+  el.innerHTML = ld2410MovingSensitivity.map((m, i) => {
+    const s = ld2410StationarySensitivity[i] ?? 0;
+    return `<div class="radar-gate-control">
+      <div class="radar-gate-label">Gate ${i}</div>
+      <label>M</label>
+      <input type="range" min="0" max="100" value="${m}" oninput="updateLd2410LocalSensitivity(${i},'moving',this.value)" onchange="sendLd2410Sensitivity(${i})">
+      <div class="radar-gate-value" id="ld2410-m-${i}">${m}</div>
+      <label>S</label>
+      <input type="range" min="0" max="100" value="${s}" oninput="updateLd2410LocalSensitivity(${i},'stationary',this.value)" onchange="sendLd2410Sensitivity(${i})">
+      <div class="radar-gate-value" id="ld2410-s-${i}">${s}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateLd2410LocalSensitivity(gate, type, value) {
+  const v = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+  ld2410SensitivityDirty = true;
+  if (type === 'moving') {
+    ld2410MovingSensitivity[gate] = v;
+    const el = document.getElementById(`ld2410-m-${gate}`);
+    if (el) el.textContent = v;
+  } else {
+    ld2410StationarySensitivity[gate] = v;
+    const el = document.getElementById(`ld2410-s-${gate}`);
+    if (el) el.textContent = v;
+  }
+}
+
+function sendLd2410Sensitivity(gate) {
+  const moving = ld2410MovingSensitivity[gate] ?? 0;
+  const stationary = ld2410StationarySensitivity[gate] ?? 0;
+  fetch(`/ld2410_set_sensitivity?gate=${gate}&moving=${moving}&stationary=${stationary}`)
+    .catch(e => console.warn('ld2410_set_sensitivity failed', e));
+}
+
+function refreshLd2410Config() {
+  fetch('/ld2410_refresh')
+    .then(() => {
+      ld2410MovingSensitivity = [];
+      ld2410StationarySensitivity = [];
+      ld2410SensitivityDirty = false;
+      return fetchLd2410Debug(true);
+    })
+    .catch(e => console.warn('ld2410_refresh failed', e));
+}
+
+function fetchLd2410Debug(forceReloadSensitivity = false) {
+  const panel = document.querySelector('.sensor-panel');
+  if (panel && panel.classList.contains('hidden')) return Promise.resolve();
+  if (ld2410FetchInFlight && !forceReloadSensitivity) return Promise.resolve();
+  ld2410FetchInFlight = true;
+  return fetch('/ld2410_debug', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(data => {
+      const eng = document.getElementById('ld2410-engineering-pill');
+      const cfg = document.getElementById('ld2410-config-pill');
+      if (eng) {
+        eng.textContent = data.engineering_current ? 'Engineering: OK' : 'Engineering: chờ dữ liệu';
+        eng.classList.toggle('ok', !!data.engineering_current);
+      }
+      if (cfg) {
+        cfg.textContent = data.config_loaded ? 'Config: OK' : 'Config: chưa đọc';
+        cfg.classList.toggle('ok', !!data.config_loaded);
+      }
+      renderLd2410Bars('ld2410-moving-bars', data.moving_gate_energy || []);
+      renderLd2410Bars('ld2410-static-bars', data.stationary_gate_energy || []);
+      if (Array.isArray(data.moving_sensitivity) && Array.isArray(data.stationary_sensitivity)) {
+        const shouldRender = forceReloadSensitivity || !ld2410MovingSensitivity.length || !ld2410StationarySensitivity.length;
+        if (shouldRender) {
+          ld2410MovingSensitivity = [...data.moving_sensitivity];
+          ld2410StationarySensitivity = [...data.stationary_sensitivity];
+          renderLd2410SensitivityControls();
+        }
+      }
+      const movingSensForChart = ld2410SensitivityDirty ? ld2410MovingSensitivity : (data.moving_sensitivity || ld2410MovingSensitivity);
+      const stationarySensForChart = ld2410SensitivityDirty ? ld2410StationarySensitivity : (data.stationary_sensitivity || ld2410StationarySensitivity);
+      drawLd2410LineChart('ld2410-moving-chart', data.moving_gate_energy || [], movingSensForChart);
+      drawLd2410LineChart('ld2410-static-chart', data.stationary_gate_energy || [], stationarySensForChart);
+      ld2410RangeHistory.push(Number(data.detection_distance) || 0);
+      while (ld2410RangeHistory.length > LD2410_HISTORY_MAX) ld2410RangeHistory.shift();
+      drawLd2410HistoryChart();
+    })
+    .catch(e => console.warn('fetchLd2410Debug failed', e))
+    .finally(() => { ld2410FetchInFlight = false; });
+}
+
+function fetchSensors() {
+  const panel = document.querySelector('.sensor-panel');
+  if (panel && panel.classList.contains('hidden')) return Promise.resolve();
+  if (sensorsFetchInFlight) return Promise.resolve();
+  sensorsFetchInFlight = true;
+  return fetch('/sensors')
+    .then(r => r.json())
+    .then(data => {
+      // Temp
+      const tempVal = parseFloat(data.temp) || 0;
+      const tempEl = document.getElementById('temp-value');
+      const tempGauge = document.getElementById('temp-gauge-val');
+      if (tempEl) tempEl.textContent = tempVal.toFixed(1);
+      if (tempGauge) {
+        let tempPct = Math.min(Math.max(tempVal / 50, 0), 1); // 0-50°C
+        tempGauge.style.strokeDashoffset = 226 - (226 * tempPct);
+        tempGauge.style.stroke = tempVal > 40 ? '#ef4444' : (tempVal > 30 ? '#f59e0b' : '#10b981');
+      }
+
+      // Hum
+      const humVal = parseFloat(data.hum) || 0;
+      const humEl = document.getElementById('hum-value');
+      const humGauge = document.getElementById('hum-gauge-val');
+      if (humEl) humEl.textContent = humVal.toFixed(0);
+      if (humGauge) {
+        let humPct = Math.min(Math.max(humVal / 100, 0), 1); // 0-100%
+        humGauge.style.strokeDashoffset = 226 - (226 * humPct);
+      }
+
+      // Smoke
+      const smokeVal = parseInt(data.mq2) || 0;
+      const mq2El = document.getElementById('mq2-value');
+      const smokeStatusEl = document.getElementById('smoke-status');
+      const smokeGauge = document.getElementById('smoke-gauge-val');
+      if (mq2El) mq2El.textContent = smokeVal + "%";
+      if (smokeStatusEl) {
+        smokeStatusEl.textContent = data.smoke ? 'NGUY HIỂM' : 'An toàn';
+        smokeStatusEl.style.color = data.smoke ? '#ef4444' : 'var(--muted)';
+      }
+      if (smokeGauge) {
+        let smokePct = Math.min(Math.max(smokeVal / 100, 0), 1);
+        smokeGauge.style.strokeDashoffset = 226 - (226 * smokePct);
+        smokeGauge.style.stroke = data.smoke ? '#ef4444' : '#8b5cf6';
+      }
+      // LD2410
+      const presEl = document.getElementById('presence-status');
+      const distEl = document.getElementById('presence-distance');
+      const occupantEl = document.getElementById('occupant-count');
+      if (presEl) presEl.textContent = data.presence ? '🟢 Có người' : '⚪ Không có';
+      if (presEl) presEl.style.color = data.presence ? '#10b981' : 'var(--muted)';
+      if (distEl) distEl.textContent = data.distance + ' cm';
+      if (occupantEl) occupantEl.textContent = Number(data.occupants || 0);
+      // Fan
+      const fanSwitch = document.getElementById('fan-toggle-switch');
+      const fanAutoSwitch = document.getElementById('fan-auto-switch');
+      const threshEl = document.getElementById('fan-threshold');
+      const threshValEl = document.getElementById('threshold-value');
+      if (fanSwitch) fanSwitch.checked = !!data.fan;
+      if (fanAutoSwitch) fanAutoSwitch.checked = !!data.fan_auto;
+      if (threshEl) threshEl.value = data.fan_threshold;
+      if (threshValEl) threshValEl.textContent = data.fan_threshold + '%';
+      updateSensorHistoryChart({ temp: tempVal, hum: humVal, mq2: smokeVal });
+      const pumpEl = document.getElementById('pump-status');
+      const pumpAutoSwitch = document.getElementById('pump-auto-switch');
+      const smokeThreshEl = document.getElementById('smoke-threshold');
+      const smokeThreshValEl = document.getElementById('smoke-threshold-value');
+      if (pumpEl) { pumpEl.textContent = data.pump ? 'BẬT' : 'TẮT'; pumpEl.style.color = data.pump ? '#10b981' : 'var(--muted)'; }
+      if (pumpAutoSwitch) pumpAutoSwitch.checked = !!data.pump_auto;
+      if (smokeThreshEl) smokeThreshEl.value = data.smoke_threshold || 10;
+      if (smokeThreshValEl) smokeThreshValEl.textContent = (data.smoke_threshold || 10) + '%';
+    })
+    .catch(e => console.warn('fetchSensors failed', e))
+    .finally(() => { sensorsFetchInFlight = false; });
+}
+function toggleFan() { fetch('/fan_control?action=toggle').then(() => fetchSensors()); }
+function toggleFanAuto() { fetch('/fan_control?action=auto').then(() => fetchSensors()); }
+function setFanThreshold(val) { fetch('/fan_control?action=threshold&val=' + val).then(() => fetchSensors()); }
+function updateThresholdLabel(val) { var el = document.getElementById('threshold-value'); if(el) el.textContent = val + '%'; }
+function togglePumpAuto() { fetch('/pump_control?action=auto').then(() => fetchSensors()); }
+function setSmokeThreshold(val) { fetch('/pump_control?action=threshold&val=' + val).then(() => fetchSensors()); }
+function updateSmokeThresholdLabel(val) { var el = document.getElementById('smoke-threshold-value'); if(el) el.textContent = val + '%'; }
+
+function formatHeaderTime(date) {
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+function updateHeaderClock() {
+  const el = document.getElementById('header-time-badge');
+  if (!el) return;
+  if (!espTimeSynced) {
+    el.textContent = 'Đang update...';
+    return;
+  }
+  el.textContent = formatHeaderTime(new Date(Date.now() + espTimeOffsetMs));
+}
+
+function syncBrowserTime() {
+  const ts = Math.floor(Date.now() / 1000);
+  const host = window.location.origin;
+  fetch(`${host}/sync_time?ts=${ts}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.ok && data.now) {
+        espTimeSynced = true;
+        espTimeOffsetMs = Number(data.now) * 1000 - Date.now();
+        updateHeaderClock();
+      }
+    })
+    .catch(() => {
+      fetch(`${host}/time_status`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.synced && data.now) {
+            espTimeSynced = true;
+            espTimeOffsetMs = Number(data.now) * 1000 - Date.now();
+          }
+          updateHeaderClock();
+        })
+        .catch(updateHeaderClock);
+    });
+}
+
+function updateSensorHistoryChart(point) {
+  const canvas = document.getElementById('sensor-history-chart');
+  if (!canvas) return;
+  sensorHistory.push({ ...point, t: new Date() });
+  while (sensorHistory.length > SENSOR_HISTORY_MAX) sensorHistory.shift();
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const w = rect.width, h = rect.height;
+  const pad = { l: 34, r: 14, t: 14, b: 26 };
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle = 'rgba(15,23,42,.08)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(107,114,128,.9)';
+  for (let i=0;i<=4;i++) {
+    const y = pad.t + (h-pad.t-pad.b) * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(String(100 - i*25), 4, y + 4);
+  }
+  const drawLine = (key, color) => {
+    if (sensorHistory.length < 2) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    sensorHistory.forEach((p, i) => {
+      const x = pad.l + (w-pad.l-pad.r) * i / Math.max(1, sensorHistory.length - 1);
+      const y = pad.t + (h-pad.t-pad.b) * (1 - Math.max(0, Math.min(100, p[key])) / 100);
+      if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  };
+  drawLine('temp', '#ef4444');
+  drawLine('hum', '#3b82f6');
+  drawLine('mq2', '#8b5cf6');
+}
+setInterval(fetchSensors, 3000);
+setInterval(fetchLd2410Debug, 1000);
+setTimeout(fetchSensors, 1000);
+setTimeout(fetchLd2410Debug, 1200);
+
+function setPass() {
+  var code = document.getElementById("passcode").value;
+  if (code.length < 4) {
+    alert('Mật khẩu cần ít nhất 4 ký tự!');
+    return;
+  }
+  fetch("/setpass?code=" + code)
+    .then(response => response.text())
+    .then(data => alert("Kết quả: " + data));
+}
+
+// Trong phần <script> của web.txt
+
+function getSelectedRole(container = document) {
+  const checked = container.querySelector('input[name="face-role"]:checked');
+  return checked ? checked.value : 'Khách';
+}
+
+
+function bindRoleCheckboxes(container = document) {
+  container.querySelectorAll('input[name="face-role"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!cb.checked) return;
+      container.querySelectorAll('input[name="face-role"]').forEach(other => { if (other !== cb) other.checked = false; });
+    });
+  });
+}// Add name
+function setFaceName() {
+  var id = document.getElementById("face-id-input").value;
+  var name = document.getElementById("face-name-input").value;
+  var rfid = document.getElementById("face-rfid-input").value.trim();
+  var role = getSelectedRole();
+  
+  if (id === "" || name === "") {
+    alert("Vui lòng nhập đủ ID và Tên!");
+    return;
+  }
+  
+  // Gọi xuống ESP32 để lưu
+  fetch("/setname?id=" + id + "&name=" + encodeURIComponent(name) + "&role=" + encodeURIComponent(role) + "&rfid=" + encodeURIComponent(rfid))
+    .then(response => response.text())
+    .then(data => {
+        alert(data);
+        // Xóa ô nhập cho gọn
+        document.getElementById("face-name-input").value = "";
+        document.getElementById("face-rfid-input").value = "";
+        fetchFaces();
+    })
+    .catch(err => alert("Lỗi kết nối!"));
+}
+
+// Trong phần <script>
+
+function deleteFace(id) {
+  appConfirm("Bạn có chắc chắn muốn xóa khuôn mặt có ID " + id + " không?", "Xóa khuôn mặt", true).then(ok => {
+    if (!ok) return;
+      fetch("/delete_face?id=" + id)
+        .then(response => response.text())
+        .then(data => {
+            alert(data);
+            fetchFaces(); // Tải lại bảng sau khi xóa
+        })
+        .catch(err => alert("Lỗi kết nối!"));
+  });
+}
+
+function clearLogs() {
+  appConfirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử mở cửa không?", "Xóa lịch sử", true).then(ok => {
+    if (!ok) return;
+      fetch("/clear_logs")
+        .then(() => fetchEvents())
+        .catch(err => alert("Lỗi kết nối!"));
+  });
+}
+
+function deleteAll() {
+  appConfirm("Hành động này sẽ xóa toàn bộ khuôn mặt, tên, cài đặt và lịch sử.\nBạn có chắc chắn muốn xóa sạch dữ liệu phần cứng không?", "Cảnh báo nguy hiểm", true).then(ok => {
+    if (!ok) return;
+      fetch("/delete_all")
+        .then(response => response.text())
+        .then(data => {
+            alert(data + "\nThiết bị sẽ tự khởi động lại, vui lòng chờ 5 giây...");
+            setTimeout(() => { location.reload(); }, 5000);
+        })
+        .catch(err => alert("Lỗi kết nối!"));
+  });
+}
+
+function fetchFaces() {
+  fetch('/get_faces')
+    .then(r => r.json())
+    .then(faces => {
+      const tbody = document.querySelector('#faces-table tbody');
+      tbody.innerHTML = '';
+      if (!Array.isArray(faces)) return;
+      faces.forEach(f => {
+        const tr = document.createElement('tr');
+        const locked = !!f.locked;
+        tr.className = `face-row ${locked ? 'face-locked' : 'face-ok'}`;
+        tr.title = locked ? 'Đang bị khóa - bấm để mở khóa' : 'Đang hoạt động';
+        tr.onclick = function() {
+          if (locked) unlockFace(f.id, f.name || ('Face ' + f.id));
+        };
+        tr.innerHTML = `<td style="padding:6px;">${f.id}</td>
+                        <td style="padding:6px;font-weight:600;">${f.name || ""}</td>
+                        <td style="padding:6px;color:var(--accent);font-weight:600;">${f.role || "Khách"}</td>
+                        <td style="padding:6px;color:var(--muted);">${f.rfid || ""}</td>
+                        <td style="padding:6px;color:var(--muted);">${f.time || ""}</td>
+                        <td style="padding:6px;"><span class="lock-pill ${locked ? 'locked' : 'ok'}">${locked ? 'Bị khóa' : 'Hoạt động'}</span></td>
+                        <td style="padding:6px;"><button onclick="event.stopPropagation(); deleteFace(${f.id})" style="background:#ef4444;color:white;padding:4px 8px;font-size:12px;border-radius:6px;">Xóa</button></td>`;
+        tbody.appendChild(tr);
+      });
+    })
+    .catch(e => console.warn('Lỗi lấy danh sách khuôn mặt:', e));
+}
+
+function unlockFace(id, name) {
+  appConfirm(`Mở khóa người dùng ${name} (ID ${id})?`, 'Mở khóa người dùng').then(ok => {
+    if (!ok) return;
+    fetch(`/unlock_face?id=${id}`)
+      .then(r => r.text())
+      .then(data => {
+        alert(data);
+        fetchFaces();
+        fetchEvents();
+      })
+      .catch(err => alert("Lỗi kết nối!"));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function (event) {
+  var baseHost = document.location.origin
+  var streamUrl = `${window.location.protocol}//${window.location.hostname}:81`
+
+  function fetchUrl(url, cb){
+    fetch(url)
+      .then(function (response) {
+        if (response.status !== 200) {
+          cb(response.status, response.statusText);
+        } else {
+          response.text().then(function(data){
+            cb(200, data);
+          }).catch(function(err) {
+            cb(-1, err);
+          });
+        }
+      })
+      .catch(function(err) {
+        cb(-1, err);
+      });
+  }
+
+  function setReg(reg, offset, mask, value, cb){
+    value = (value & mask) << offset;
+    mask = mask << offset;
+    fetchUrl(`${baseHost}/reg?reg=${reg}&mask=${mask}&val=${value}`, cb);
+  }
+
+  function getReg(reg, offset, mask, cb){
+    mask = mask << offset;
+    fetchUrl(`${baseHost}/greg?reg=${reg}&mask=${mask}`, function(code, txt){
+      let value = 0;
+      if(code == 200){
+        value = parseInt(txt);
+        value = (value & mask) >> offset;
+        txt = ''+value;
+      }
+      cb(code, txt);
+    });
+  }
+
+  function setXclk(xclk, cb){
+    fetchUrl(`${baseHost}/xclk?xclk=${xclk}`, cb);
+  }
+
+  function setWindow(start_x, start_y, end_x, end_y, offset_x, offset_y, total_x, total_y, output_x, output_y, scaling, binning, cb){
+    fetchUrl(`${baseHost}/resolution?sx=${start_x}&sy=${start_y}&ex=${end_x}&ey=${end_y}&offx=${offset_x}&offy=${offset_y}&tx=${total_x}&ty=${total_y}&ox=${output_x}&oy=${output_y}&scale=${scaling}&binning=${binning}`, cb);
+  }
+
+  const setRegButton = document.getElementById('set-reg')
+  setRegButton.onclick = () => {
+    let reg = parseInt(document.getElementById('reg-addr').value);
+    let mask = parseInt(document.getElementById('reg-mask').value);
+    let value = parseInt(document.getElementById('reg-value').value);
+
+    setReg(reg, 0, mask, value, function(code, txt){
+      if(code != 200){
+        alert('Lỗi ['+code+']: '+txt);
+      }
+    });
+  }
+
+  const getRegButton = document.getElementById('get-reg')
+  getRegButton.onclick = () => {
+    let reg = parseInt(document.getElementById('get-reg-addr').value);
+    let mask = parseInt(document.getElementById('get-reg-mask').value);
+    let value = document.getElementById('get-reg-value');
+
+    getReg(reg, 0, mask, function(code, txt){
+      if(code != 200){
+        value.innerHTML = 'Lỗi ['+code+']: '+txt;
+      } else {
+        value.innerHTML = '0x'+parseInt(txt).toString(16)+' ('+txt+')';
+      }
+    });
+  }
+
+  const setXclkButton = document.getElementById('set-xclk')
+  setXclkButton.onclick = () => {
+    let xclk = parseInt(document.getElementById('xclk').value);
+
+    setXclk(xclk, function(code, txt){
+      if(code != 200){
+        alert('Lỗi ['+code+']: '+txt);
+      }
+    });
+  }
+
+  const setResButton = document.getElementById('set-resolution')
+  setResButton.onclick = () => {
+    let start_x = parseInt(document.getElementById('start-x').value);
+    let offset_x = parseInt(document.getElementById('offset-x').value);
+    let offset_y = parseInt(document.getElementById('offset-y').value);
+    let total_x = parseInt(document.getElementById('total-x').value);
+    let total_y = parseInt(document.getElementById('total-y').value);
+    let output_x = parseInt(document.getElementById('output-x').value);
+    let output_y = parseInt(document.getElementById('output-y').value);
+
+    setWindow(start_x, 0, 0, 0, offset_x, offset_y, total_x, total_y, output_x, output_y, false, false, function(code, txt){
+      if(code != 200){
+        alert('Lỗi ['+code+']: '+txt);
+      }
+    });
+  }
+
+  const setRegValue = (el) => {
+    let reg = el.attributes.reg?parseInt(el.attributes.reg.nodeValue):0;
+    let offset = el.attributes.offset?parseInt(el.attributes.offset.nodeValue):0;
+    let mask = el.attributes.mask?parseInt(el.attributes.mask.nodeValue):255;
+    let value = 0;
+    switch (el.type) {
+      case 'checkbox':
+        value = el.checked ? mask : 0;
+        break;
+      case 'range':
+      case 'text':
+      case 'select-one':
+        value = el.value;
+        break
+      default:
+        return;
+    }
+
+    setReg(reg, offset, mask, value, function(code, txt){
+      if(code != 200){
+        alert('Lỗi ['+code+']: '+txt);
+      }
+    });
+  }
+
+  // Attach on change action for register elements
+  document
+    .querySelectorAll('.reg-action')
+    .forEach(el => {
+        if (el.type === 'text') {
+            el.onkeyup = function(e){
+                if(e.keyCode == 13){
+                    setRegValue(el);
+                }
+            }
+        } else {
+            el.onchange = () => setRegValue(el)
+        }
+    })
+
+
+  const updateRegValue = (el, value, updateRemote) => {
+    let initialValue;
+    let offset = el.attributes.offset?parseInt(el.attributes.offset.nodeValue):0;
+    let mask = (el.attributes.mask?parseInt(el.attributes.mask.nodeValue):255) << offset;
+    value = (value & mask) >> offset;
+    if (el.type === 'checkbox') {
+      initialValue = el.checked
+      value = !!value
+      el.checked = value
+    } else {
+      initialValue = el.value
+      el.value = value
+    }
+  }
+
+
+  const printReg = (el) => {
+    let reg = el.attributes.reg?parseInt(el.attributes.reg.nodeValue):0;
+    let offset = el.attributes.offset?parseInt(el.attributes.offset.nodeValue):0;
+    let mask = el.attributes.mask?parseInt(el.attributes.mask.nodeValue):255;
+    let value = 0;
+    switch (el.type) {
+      case 'checkbox':
+        value = el.checked ? mask : 0;
+        break;
+      case 'range':
+      case 'select-one':
+        value = el.value;
+        break
+      default:
+        return;
+    }
+    value = (value & mask) << offset;
+    return '0x'+reg.toString(16)+', 0x'+value.toString(16);
+  }
+
+
+
+  const hide = el => { el.classList.add('hidden') }
+  const show = el => { el.classList.remove('hidden') }
+
+  const disable = el => { el.classList.add('disabled'); el.disabled = true }
+  const enable = el => { el.classList.remove('disabled'); el.disabled = false }
+
+  const updateValue = (el, value, updateRemote) => {
+    updateRemote = updateRemote == null ? true : updateRemote
+    let initialValue
+    if (el.type === 'checkbox') {
+      initialValue = el.checked
+      value = !!value
+      el.checked = value
+    } else {
+      initialValue = el.value
+      el.value = value
+    }
+
+    if (updateRemote && initialValue !== value) {
+      updateConfig(el);
+    } else if(!updateRemote){
+      if(el.id === "aec"){
+        value ? hide(exposure) : show(exposure)
+      } else if(el.id === "agc"){
+        if (value) {
+          show(gainCeiling)
+          hide(agcGain)
+        } else {
+          hide(gainCeiling)
+          show(agcGain)
+        }
+      } else if(el.id === "awb_gain"){
+        value ? show(wb) : hide(wb)
+      } else if(el.id === "face_recognize"){
+        value ? enable(enrollButton) : disable(enrollButton)
+      } else if(el.id == "led_intensity"){
+        value > -1 ? show(ledGroup) : hide(ledGroup)
+      }
+    }
+  }
+
+  function updateConfig (el) {
+    let value
+    switch (el.type) {
+      case 'checkbox':
+        value = el.checked ? 1 : 0
+        break
+      case 'range':
+      case 'select-one':
+        value = el.value
+        break
+      case 'button':
+      case 'submit':
+        value = '1'
+        break
+      default:
+        return
+    }
+    if (el.id === 'hmirror') {
+      phoneCaptureMirror = value === 1
+    }
+
+    const query = `${baseHost}/control?var=${el.id}&val=${value}`
+
+    fetch(query)
+      .then(response => {
+        console.log(`request to ${query} finished, status: ${response.status}`)
+      })
+  }
+
+  document
+    .querySelectorAll('.close')
+    .forEach(el => {
+      el.onclick = () => {
+        hide(el.parentNode)
+      }
+    })
+
+  // read initial values
+  fetch(`${baseHost}/status`)
+    .then(function (response) {
+      return response.json()
+    })
+    .then(function (state) {
+      phoneCaptureMirror = Number(state.hmirror || 0) === 1
+      document
+        .querySelectorAll('.default-action')
+        .forEach(el => {
+          updateValue(el, state[el.id], false)
+        })
+      document
+        .querySelectorAll('.reg-action')
+        .forEach(el => {
+            let reg = el.attributes.reg?parseInt(el.attributes.reg.nodeValue):0;
+            if(reg == 0){
+              return;
+            }
+            updateRegValue(el, state['0x'+reg.toString(16)], false)
+        })
+    })
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function parseLocalDateTime(value) {
+  if (!value || String(value).startsWith('Chua dong bo')) return null;
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+}
+
+function sameDate(a, b) {
+  return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function minutesOfDay(date) {
+  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+}
+
+function parseDoorHistory(logs) {
+  const visits = [];
+  const active = new Map();
+  (Array.isArray(logs) ? logs : []).forEach(ev => {
+    const actor = String(ev.actor || '');
+    const logTime = parseLocalDateTime(ev.time);
+    if (actor.startsWith('Vao phong:')) {
+      const id = (actor.match(/ID=(\d+)/) || [])[1] || '';
+      const name = (actor.match(/Ten=([^,]+)/) || [])[1] || (id ? `ID ${id}` : 'Khong ro');
+      const uid = (actor.match(/RFID=([^,]+)/) || [])[1] || '';
+      const entryText = (actor.match(/Gio vao=([0-9:\- ]+)/) || [])[1] || ev.time;
+      const start = parseLocalDateTime(entryText) || logTime;
+      const key = id || uid || `${name}-${start ? start.getTime() : visits.length}`;
+      if (start) active.set(key, { id, name, uid, start, end: null });
+    } else if (actor.startsWith('Ra khoi phong:')) {
+      const id = (actor.match(/ID=(\d+)/) || [])[1] || '';
+      const name = (actor.match(/Ten=([^,]+)/) || [])[1] || (id ? `ID ${id}` : 'Khong ro');
+      const uid = (actor.match(/RFID=([^,]+)/) || [])[1] || '';
+      const entryText = (actor.match(/Gio vao=([0-9:\- ]+)/) || [])[1] || '';
+      const exitText = (actor.match(/Gio ra=([0-9:\- ]+)/) || [])[1] || ev.time;
+      const start = parseLocalDateTime(entryText);
+      const end = parseLocalDateTime(exitText) || logTime;
+      const key = id || uid || name;
+      const openVisit = active.get(key);
+      if (openVisit && end) {
+        openVisit.end = end;
+        visits.push(openVisit);
+        active.delete(key);
+      } else if (start && end) {
+        visits.push({ id, name, uid, start, end });
+      }
+    }
+  });
+  active.forEach(v => visits.push(v));
+  return visits.filter(v => v.start).sort((a, b) => a.start - b.start);
+}
+
+function initHistoryControls() {
+  const monthSelect = document.getElementById('history-month');
+  const yearSelect = document.getElementById('history-year');
+  if (!monthSelect || !yearSelect || historyReady) return;
+  for (let i = 0; i < 12; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `Tháng ${i + 1}`;
+    monthSelect.appendChild(opt);
+  }
+  const nowYear = new Date().getFullYear();
+  for (let y = nowYear - 3; y <= nowYear + 1; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  }
+  historyReady = true;
+}
+
+function ensureHistoryYearOption(year) {
+  const yearSelect = document.getElementById('history-year');
+  if (!yearSelect) return;
+  if ([...yearSelect.options].some(opt => Number(opt.value) === Number(year))) return;
+  const opt = document.createElement('option');
+  opt.value = year;
+  opt.textContent = year;
+  yearSelect.appendChild(opt);
+  [...yearSelect.options]
+    .sort((a, b) => Number(a.value) - Number(b.value))
+    .forEach(optNode => yearSelect.appendChild(optNode));
+}
+
+function applyHistoryDate() {
+  initHistoryControls();
+  const monthSelect = document.getElementById('history-month');
+  const yearSelect = document.getElementById('history-year');
+  historyState.month = Number(monthSelect?.value ?? historyState.month);
+  historyState.year = Number(yearSelect?.value ?? historyState.year);
+  historyState.selected = new Date(historyState.year, historyState.month, 1);
+  renderDoorHistory();
+}
+
+function changeHistoryMonth(delta) {
+  initHistoryControls();
+  const next = new Date(historyState.year, historyState.month + delta, 1);
+  historyState.year = next.getFullYear();
+  historyState.month = next.getMonth();
+  historyState.selected = new Date(historyState.year, historyState.month, 1);
+  ensureHistoryYearOption(historyState.year);
+  renderDoorHistory();
+}
+
+function renderDoorHistory() {
+  initHistoryControls();
+  const calendar = document.getElementById('history-calendar');
+  if (!calendar) return;
+  const monthSelect = document.getElementById('history-month');
+  const yearSelect = document.getElementById('history-year');
+  ensureHistoryYearOption(historyState.year);
+  if (monthSelect) monthSelect.value = historyState.month;
+  if (yearSelect) yearSelect.value = historyState.year;
+  const title = document.getElementById('history-title');
+  if (title) title.textContent = `THÁNG ${String(historyState.month + 1).padStart(2, '0')} - ${historyState.year}`;
+
+  const visits = parseDoorHistory(doorHistoryLogs);
+  const countByDate = new Map();
+  visits.forEach(v => {
+    const key = `${v.start.getFullYear()}-${v.start.getMonth()}-${v.start.getDate()}`;
+    countByDate.set(key, (countByDate.get(key) || 0) + 1);
+  });
+
+  const weekdays = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'];
+  calendar.innerHTML = weekdays.map(d => `<div class="calendar-weekday">${d}</div>`).join('');
+  const first = new Date(historyState.year, historyState.month, 1);
+  const mondayOffset = (first.getDay() + 6) % 7;
+  const start = new Date(historyState.year, historyState.month, 1 - mondayOffset);
+  for (let i = 0; i < 42; i++) {
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+    const count = countByDate.get(key) || 0;
+    const cell = document.createElement('div');
+    cell.className = 'calendar-day' +
+      (day.getMonth() !== historyState.month ? ' other-month' : '') +
+      (sameDate(day, historyState.selected) ? ' selected' : '') +
+      ([0, 6].includes(day.getDay()) ? ' weekend' : '');
+    cell.innerHTML = `<div class="calendar-day-number">${String(day.getDate()).padStart(2, '0')}</div>` +
+      (count ? `<span class="calendar-dot"></span><span class="calendar-count">${count} lượt</span>` : '');
+    cell.onclick = () => {
+      historyState.selected = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      historyState.year = day.getFullYear();
+      historyState.month = day.getMonth();
+      renderDoorHistory();
+    };
+    calendar.appendChild(cell);
+  }
+  renderHistoryGantt(visits);
+}
+
+function renderHistoryGantt(visits) {
+  const target = document.getElementById('history-gantt');
+  const title = document.getElementById('history-gantt-title');
+  if (!target) return;
+  const selected = historyState.selected;
+  if (title) title.textContent = `Lịch sử ra/vào ngày ${String(selected.getDate()).padStart(2, '0')}/${String(selected.getMonth() + 1).padStart(2, '0')}/${selected.getFullYear()}`;
+  const dayVisits = visits.filter(v => sameDate(v.start, selected));
+  if (!dayVisits.length) {
+    target.innerHTML = '<div class="gantt-empty">Không có lượt vào phòng trong ngày đã chọn</div>';
+    return;
+  }
+  let html = '<div class="gantt-grid"><div class="gantt-head">Người dùng</div>';
+  for (let h = 1; h <= 24; h++) html += `<div class="gantt-head">${h}</div>`;
+  const colors = ['#f59e0b', '#84cc16', '#fb7185', '#06b6d4', '#f97316', '#6366f1'];
+  dayVisits.forEach((v, idx) => {
+    const end = v.end || new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 23, 59, 59);
+    const startMin = Math.max(0, minutesOfDay(v.start));
+    const endMin = Math.min(1440, Math.max(startMin + 5, minutesOfDay(end)));
+    const left = (startMin / 1440) * 100;
+    const width = Math.max(1.5, ((endMin - startMin) / 1440) * 100);
+    const label = `${String(v.start.getHours()).padStart(2, '0')}:${String(v.start.getMinutes()).padStart(2, '0')}-${v.end ? String(end.getHours()).padStart(2, '0') + ':' + String(end.getMinutes()).padStart(2, '0') : 'nay'}`;
+    html += `<div class="gantt-row"><div class="gantt-name">${escapeHtml(v.name)}${v.id ? ` <span style="color:#94a3b8">#${escapeHtml(v.id)}</span>` : ''}</div>`;
+    html += `<div class="gantt-lane"><div class="gantt-bar" style="left:${left}%;width:${width}%;background:${colors[idx % colors.length]}">${label}</div></div></div>`;
+  });
+  html += '</div>';
+  target.innerHTML = html;
+}
+
+window.changeHistoryMonth = changeHistoryMonth;
+window.applyHistoryDate = applyHistoryDate;
+window.renderDoorHistory = renderDoorHistory;
+
+function updateEventTable(logs) {
+  const tbody = document.querySelector('#event-table tbody');
+  tbody.innerHTML = '';
+  
+  if (!Array.isArray(logs)) return;
+  doorHistoryLogs = logs;
+  renderDoorHistory();
+  const newest = logs.length ? logs[logs.length - 1] : null;
+  const newestKey = newest ? `${newest.time || ''}|${newest.actor || ''}` : '';
+  if (newestKey && eventLogInitialized && newestKey !== latestEventLogKey) {
+    showLogToast(newest);
+  }
+  if (newestKey) latestEventLogKey = newestKey;
+  eventLogInitialized = true;
+  
+  // Reverse to show newest top if necessary, or just iterate assuming they are appended
+  logs.slice().reverse().forEach(ev => {
+    if (!ev.time) return; // skip empty dummy object
+    const shownTime = String(ev.time).startsWith('1970-') ? 'Chưa đồng bộ thời gian' : ev.time;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="padding:6px;">${shownTime}</td>
+                    <td style="padding:6px;font-weight:600;color:var(--accent);">${ev.actor}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function fetchEvents() {
+  fetch(`${baseHost}/logs`)
+    .then(r => r.json())
+    .then(j => updateEventTable(j))
+    .catch(e => {
+      console.warn('fetchEvents failed', e);
+    });
+}
+
+function updateOccupantsTable(items) {
+  const tbody = document.querySelector('#occupants-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!Array.isArray(items) || items.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="5" style="padding:6px;color:var(--muted);">Không có người trong phòng</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="padding:6px;">${item.id ?? ""}</td>
+                    <td style="padding:6px;font-weight:600;">${item.name || ""}</td>
+                    <td style="padding:6px;color:var(--accent);font-weight:600;">${item.role || "Khách"}</td>
+                    <td style="padding:6px;color:var(--muted);">${item.entry_time || ""}</td>
+                    <td style="padding:6px;color:var(--accent);font-weight:600;">${item.duration || ""}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function fetchOccupants() {
+  fetch(`${baseHost}/occupants`)
+    .then(r => r.json())
+    .then(j => updateOccupantsTable(j))
+    .catch(e => console.warn('fetchOccupants failed', e));
+}
+window.fetchOccupants = fetchOccupants;
+
+// call periodically
+bindRoleCheckboxes(document);
+syncBrowserTime();
+setInterval(updateHeaderClock, 1000);
+setTimeout(() => { fetchEvents(); fetchFaces(); fetchOccupants(); }, 500);     // initial
+setInterval(fetchEvents, 5000);   // every 5s
+setInterval(fetchOccupants, 3000);
+
+  const view = document.getElementById('stream')
+  const viewContainer = document.getElementById('stream-container')
+  const streamButton = document.getElementById('toggle-stream')
+  const enrollButton = document.getElementById('face_enroll')
+  const closeButton = document.getElementById('close-stream')
+  const saveButton = document.getElementById('save-still')
+  const ledGroup = document.getElementById('led-group')
+
+  const stopStream = () => {
+    view.src = ''
+    if (streamButton) streamButton.innerHTML = 'Start Stream'
+  }
+
+  const startStream = () => {
+    view.src = `${streamUrl}/stream`
+    show(viewContainer)
+    if (streamButton) streamButton.innerHTML = 'Stop Stream'
+  }
+  // Attach actions to buttons
+
+  closeButton.onclick = () => {
+    stopStream()
+    hide(viewContainer)
+  }
+
+  // ===== Phone Camera Integration =====
+  const phoneVideo = document.getElementById('phone-video')
+  const phoneOverlay = document.getElementById('phone-overlay')
+  const phoneCamContainer = document.getElementById('phone-cam-container')
+  const phoneCaptureBtn = document.getElementById('phone-capture-btn')
+  const phoneCloseBtn = document.getElementById('phone-close-btn')
+  const closePhoneCamBtn = document.getElementById('close-phone-cam')
+  const phoneFaceStatus = document.getElementById('phone-face-status')
+  let phoneStream = null
+  let faceDetectionInterval = null
+  let faceApiLoaded = false
+  let faceStableStart = 0
+  let autoCaptured = false
+  let phoneFaceReady = false
+  let phoneCaptureMirror = false
+
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024)
+  }
+
+  async function loadFaceApi() {
+    if (faceApiLoaded) return true
+    if (typeof faceapi === 'undefined') {
+      phoneFaceStatus.textContent = '⚠️ Thư viện AI chưa tải xong, vui lòng chờ...'
+      // Thử chờ thêm 3 giây rồi kiểm tra lại
+      await new Promise(r => setTimeout(r, 3000))
+      if (typeof faceapi === 'undefined') {
+        phoneFaceStatus.innerHTML = '❌ Không tải được thư viện face-api.js.<br>Kiểm tra kết nối Internet.'
+        return false
+      }
+    }
+
+    const modelUrls = [
+      'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+      'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
+      'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+    ]
+
+    for (let i = 0; i < modelUrls.length; i++) {
+      try {
+        phoneFaceStatus.textContent = '🧠 Đang tải model AI... (nguồn ' + (i + 1) + '/' + modelUrls.length + ')'
+        await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrls[i])
+        faceApiLoaded = true
+        phoneFaceStatus.textContent = '✅ Model AI sẵn sàng — Đang tìm khuôn mặt...'
+        return true
+      } catch(e) {
+        console.warn('face-api load attempt ' + (i+1) + ' failed:', modelUrls[i], e)
+      }
+    }
+    phoneFaceStatus.innerHTML = '❌ Không tải được model AI từ tất cả nguồn.<br>Hãy đảm bảo thiết bị có kết nối Internet.'
+    return false
+  }
+
+  function enableManualPhoneCapture(message) {
+    if (faceDetectionInterval) { clearInterval(faceDetectionInterval); faceDetectionInterval = null }
+    phoneFaceReady = true
+    phoneFaceStatus.textContent = message || 'Không tải được AI trên điện thoại. Bấm chụp ảnh, ESP32 sẽ kiểm tra khuôn mặt.'
+    phoneCaptureBtn.disabled = false
+    phoneCaptureBtn.textContent = 'Đăng ký khuôn mặt'
+    phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+  }
+
+  function restartPhoneDetectionOrManual(message) {
+    if (faceApiLoaded) {
+      startFaceDetection()
+    } else {
+      enableManualPhoneCapture(message)
+    }
+  }
+
+  function getPhoneCaptureRect() {
+    const vw = phoneVideo.videoWidth || 640
+    const vh = phoneVideo.videoHeight || 480
+    const targetRatio = 4 / 3
+    let sx = 0, sy = 0, sw = vw, sh = vh
+    if (vw / vh > targetRatio) {
+      sw = vh * targetRatio
+      sx = (vw - sw) / 2
+    } else if (vw / vh < targetRatio) {
+      sh = vw / targetRatio
+      sy = (vh - sh) / 2
+    }
+    return { sx, sy, sw, sh }
+  }
+
+  async function startPhoneCamera() {
+    // Kiểm tra Secure Context — getUserMedia yêu cầu HTTPS hoặc localhost
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      show(phoneCamContainer)
+      hide(viewContainer)
+      phoneFaceStatus.innerHTML =
+        '⚠️ <b>Trình duyệt chặn camera</b> vì trang web đang dùng HTTP.<br><br>' +
+        '📱 <b>Trên điện thoại Android (Chrome):</b><br>' +
+        '1. Mở <code>chrome://flags</code><br>' +
+        '2. Tìm "<b>Insecure origins treated as secure</b>"<br>' +
+        '3. Thêm <code>' + window.location.origin + '</code><br>' +
+        '4. Bật "Enabled" → Relaunch<br><br>' +
+        '💻 <b>Trên máy tính (Chrome):</b><br>' +
+        '1. Mở <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code><br>' +
+        '2. Thêm <code>' + window.location.origin + '</code><br>' +
+        '3. Bật "Enabled" → Relaunch'
+      return
+    }
+
+    try {
+      phoneFaceStatus.textContent = '📱 Đang mở camera...'
+      show(phoneCamContainer)
+      hide(viewContainer)
+      stopStream()
+      phoneVideo.setAttribute('playsinline', '')
+      phoneVideo.setAttribute('muted', '')
+      phoneStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      })
+      phoneVideo.srcObject = phoneStream
+      phoneVideo.muted = true
+      await phoneVideo.play()
+      phoneFaceReady = false
+
+      const loaded = await loadFaceApi()
+      if (loaded) startFaceDetection()
+      else enableManualPhoneCapture('Không tải được AI trên điện thoại. Bấm chụp ảnh, ESP32 sẽ kiểm tra khuôn mặt.')
+    } catch(e) {
+      console.error('getUserMedia error:', e)
+      if (e.name === 'NotAllowedError') {
+        phoneFaceStatus.textContent = '❌ Quyền camera bị từ chối. Vui lòng cho phép trong cài đặt trình duyệt.'
+      } else if (e.name === 'NotFoundError') {
+        phoneFaceStatus.textContent = '❌ Không tìm thấy camera trên thiết bị này.'
+      } else {
+        phoneFaceStatus.textContent = '❌ Lỗi camera: ' + e.message
+      }
+    }
+  }
+
+  function stopPhoneCamera() {
+    if (faceDetectionInterval) { clearInterval(faceDetectionInterval); faceDetectionInterval = null }
+    if (phoneStream) { phoneStream.getTracks().forEach(t => t.stop()); phoneStream = null }
+    phoneVideo.srcObject = null
+    hide(phoneCamContainer)
+    phoneCaptureBtn.disabled = true
+    phoneCaptureBtn.textContent = '📸 Đang chờ khuôn mặt...'
+    phoneFaceReady = false
+  }
+
+  function startFaceDetection() {
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 })
+    phoneFaceStatus.textContent = '🔍 Đang tìm khuôn mặt...'
+
+    faceDetectionInterval = setInterval(async () => {
+      if (!phoneVideo.srcObject || phoneVideo.paused) return
+      try {
+        const detection = await faceapi.detectSingleFace(phoneVideo, options)
+        // Resize canvas to match video display size
+        const displayW = phoneVideo.clientWidth
+        const displayH = phoneVideo.clientHeight
+        phoneOverlay.width = displayW
+        phoneOverlay.height = displayH
+        const ctx = phoneOverlay.getContext('2d')
+        ctx.clearRect(0, 0, displayW, displayH)
+
+        if (detection) {
+          const cap = getPhoneCaptureRect()
+          const box = detection.box
+          const faceRatio = box.width / cap.sw
+          const faceCenterX = (box.x + box.width / 2 - cap.sx) / cap.sw
+          const faceCenterY = (box.y + box.height / 2 - cap.sy) / cap.sh
+          const faceGoodSize = faceRatio >= 0.24 && faceRatio <= 0.60
+          const faceGoodCenter = faceCenterX >= 0.28 && faceCenterX <= 0.72 && faceCenterY >= 0.22 && faceCenterY <= 0.78
+          // Scale detection box to display size
+          const scaleX = displayW / phoneVideo.videoWidth
+          const scaleY = displayH / phoneVideo.videoHeight
+          const x = box.x * scaleX
+          const y = box.y * scaleY
+          const w = box.width * scaleX
+          const h = box.height * scaleY
+
+          // Draw bounding box
+          ctx.strokeStyle = '#0ea5a4'
+          ctx.lineWidth = 3
+          ctx.strokeRect(x, y, w, h)
+
+          // Draw corner accents
+          const cl = 12
+          ctx.strokeStyle = '#06b6d4'
+          ctx.lineWidth = 4
+          ctx.beginPath()
+          // Top-left
+          ctx.moveTo(x, y + cl); ctx.lineTo(x, y); ctx.lineTo(x + cl, y)
+          // Top-right
+          ctx.moveTo(x + w - cl, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cl)
+          // Bottom-left
+          ctx.moveTo(x, y + h - cl); ctx.lineTo(x, y + h); ctx.lineTo(x + cl, y + h)
+          // Bottom-right
+          ctx.moveTo(x + w - cl, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cl)
+          ctx.stroke()
+
+          // Score label
+          ctx.fillStyle = 'rgba(14,165,164,0.85)'
+          ctx.fillRect(x, y - 22, 90, 20)
+          ctx.fillStyle = '#fff'
+          ctx.font = 'bold 12px Inter, sans-serif'
+          ctx.fillText('Face ' + (detection.score * 100).toFixed(0) + '%', x + 4, y - 7)
+
+          if (!faceGoodSize || !faceGoodCenter) {
+            phoneFaceReady = false
+            if (!faceGoodSize) {
+              phoneFaceStatus.textContent = faceRatio < 0.24
+                ? 'Hãy đưa điện thoại lại gần hơn, mặt đang quá nhỏ.'
+                : 'Hãy đưa điện thoại ra xa hơn, mặt đang quá lớn.'
+            } else {
+              phoneFaceStatus.textContent = 'Hãy đưa mặt vào giữa khung hình.'
+            }
+            phoneCaptureBtn.disabled = true
+            phoneCaptureBtn.textContent = 'Căn chỉnh lại khuôn mặt'
+            return
+          }
+
+          // Auto-capture logic: face stable for 2 seconds
+          if (false && faceStableStart === 0) {
+            faceStableStart = Date.now()
+            phoneFaceStatus.textContent = '😀 Phát hiện khuôn mặt! Giữ yên...'
+          } else {
+            const elapsed = Date.now() - faceStableStart
+            const remaining = Math.max(0, 2000 - elapsed)
+            if (remaining > 0) {
+              phoneFaceStatus.textContent = '😀 Giữ yên... tự động chụp sau ' + (remaining / 1000).toFixed(1) + 's'
+            }
+            if (false && elapsed >= 2000 && !autoCaptured) {
+              autoCaptured = true
+              // Chỉ chụp ảnh, KHÔNG hỏi tên
+              capturePhonePhoto()
+            }
+          }
+          phoneFaceReady = true
+          phoneFaceStatus.textContent = 'Đã phát hiện khuôn mặt. Bấm "Đăng ký khuôn mặt" để gửi ảnh.'
+          phoneCaptureBtn.disabled = false
+          phoneCaptureBtn.textContent = 'Đăng ký khuôn mặt'
+          phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+          phoneCaptureBtn.dataset.manualEnroll = '1'
+          phoneCaptureBtn.textContent = 'Đăng ký khuôn mặt'
+          phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+        } else {
+          phoneFaceReady = false
+          phoneFaceStatus.textContent = '🔍 Đang tìm khuôn mặt... Hãy đưa mặt vào khung hình'
+          phoneCaptureBtn.disabled = true
+          phoneCaptureBtn.textContent = '📸 Đang chờ khuôn mặt...'
+        }
+      } catch(e) { console.warn('Detection error:', e) }
+    }, 150)
+  }
+
+  let capturedBlob = null // Lưu ảnh đã chụp
+
+  function captureCurrentPhoneFrameBlob(callback) {
+    if (!phoneVideo.srcObject) return
+    const captureCanvas = document.createElement('canvas')
+    captureCanvas.width = 320
+    captureCanvas.height = 240
+    const ctx = captureCanvas.getContext('2d')
+    const cap = getPhoneCaptureRect()
+    if (phoneCaptureMirror) {
+      ctx.translate(320, 0)
+      ctx.scale(-1, 1)
+    }
+    ctx.drawImage(phoneVideo, cap.sx, cap.sy, cap.sw, cap.sh, 0, 0, 320, 240)
+    captureCanvas.toBlob((blob) => callback(blob), 'image/jpeg', 0.85)
+  }
+
+  function beginPhoneEnrollFromCurrentFrame() {
+    if (!phoneFaceReady && faceApiLoaded) {
+      phoneFaceStatus.textContent = 'Chưa phát hiện khuôn mặt hợp lệ.'
+      return
+    }
+    showNamePopup(
+      (name, role) => {
+        phoneCaptureBtn.disabled = true
+        phoneFaceStatus.textContent = 'Đang chụp ảnh và gửi tới ESP32...'
+        captureCurrentPhoneFrameBlob((blob) => {
+          if (!blob) {
+            phoneFaceStatus.textContent = 'Không chụp được ảnh từ camera điện thoại.'
+            resetPhoneCapture()
+            return
+          }
+          capturedBlob = blob
+          sendEnrollToESP32(name, role)
+        })
+      },
+      () => {
+        phoneFaceReady = false
+        restartPhoneDetectionOrManual('Đã hủy. Bấm đăng ký khi phát hiện khuôn mặt.')
+      }
+    )
+  }
+
+  // Chỉ chụp ảnh, lưu blob, hiện nút Đăng ký
+  function capturePhonePhoto() {
+    if (!phoneVideo.srcObject) return
+    const captureCanvas = document.createElement('canvas')
+    captureCanvas.width = 320
+    captureCanvas.height = 240
+    const ctx = captureCanvas.getContext('2d')
+    const cap = getPhoneCaptureRect()
+    if (phoneCaptureMirror) {
+      ctx.translate(320, 0)
+      ctx.scale(-1, 1)
+    }
+    ctx.drawImage(phoneVideo, cap.sx, cap.sy, cap.sw, cap.sh, 0, 0, 320, 240)
+
+    captureCanvas.toBlob((blob) => {
+      if (!blob) { phoneFaceStatus.textContent = '❌ Lỗi chụp ảnh'; autoCaptured = false; return }
+      capturedBlob = blob
+      phoneFaceStatus.textContent = '✅ Đã chụp ảnh! Bấm "Đăng ký khuôn mặt" để tiếp tục.'
+      phoneCaptureBtn.disabled = false
+      phoneCaptureBtn.textContent = '✅ Đăng ký khuôn mặt'
+      phoneCaptureBtn.onclick = () => showNamePopup((name, role) => sendEnrollToESP32(name, role),
+        () => {
+          capturedBlob = null
+          autoCaptured = false
+          faceStableStart = 0
+          phoneFaceStatus.textContent = '👀 Đã hủy. Đang tìm khuôn mặt...'
+          phoneCaptureBtn.textContent = '⏳ Đang chờ khuôn mặt...'
+          phoneCaptureBtn.disabled = true
+          restartPhoneDetectionOrManual('Đã hủy. Bấm chụp ảnh, ESP32 sẽ kiểm tra khuôn mặt.')
+        }
+      )
+      // Dừng detection
+      if (faceDetectionInterval) { clearInterval(faceDetectionInterval); faceDetectionInterval = null }
+    }, 'image/jpeg', 0.85)
+  }
+  // ===== Popup nhập thông tin đăng ký =====
+  function showNamePopup(onConfirm, onCancel) {
+    const overlay = document.createElement('div')
+    overlay.className = 'popup-overlay'
+    overlay.innerHTML = `
+      <div class="popup-card">
+        <h3>Đăng ký thông tin</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px 0">Nhập tên và chọn chức vụ cho khuôn mặt mới</p>
+        <input id="popup-name-input" type="text" placeholder="VD: Nguyen Van A"
+               style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(15,23,42,0.15);font-size:15px;margin-bottom:14px;box-sizing:border-box;background:#fbfdff">
+        <div class="role-options" style="margin-bottom:14px;text-align:left">
+          <label class="role-option"><input type="checkbox" name="face-role" value="Thủ kho"> Thủ kho</label>
+          <label class="role-option"><input type="checkbox" name="face-role" value="Nhân viên"> Nhân viên</label>
+          <label class="role-option"><input type="checkbox" name="face-role" value="Bảo vệ"> Bảo vệ</label>
+          <label class="role-option"><input type="checkbox" name="face-role" value="Khách" checked> Khách</label>
+        </div>
+        <button id="popup-name-ok" style="background:var(--accent);color:#fff">Đăng ký</button>
+        <button id="popup-name-cancel" class="ghost">Hủy</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    bindRoleCheckboxes(overlay)
+    const input = document.getElementById('popup-name-input')
+    input.focus()
+
+    document.getElementById('popup-name-ok').onclick = () => {
+      let name = input.value.trim()
+      if (name === '') name = 'Chưa có tên'
+      const role = getSelectedRole(overlay)
+      overlay.remove()
+      if (onConfirm) onConfirm(name, role)
+    }
+    document.getElementById('popup-name-cancel').onclick = () => {
+      overlay.remove()
+      autoCaptured = false
+      faceStableStart = 0
+      phoneFaceStatus.textContent = 'Đã hủy. Đang tìm khuôn mặt...'
+      phoneCaptureBtn.textContent = 'Đang chờ khuôn mặt...'
+      phoneCaptureBtn.disabled = true
+      phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+      if (onCancel) onCancel()
+      restartPhoneDetectionOrManual('Đã hủy. Bấm chụp ảnh, ESP32 sẽ kiểm tra khuôn mặt.')
+    }
+    input.onkeyup = (e) => { if (e.key === 'Enter') document.getElementById('popup-name-ok').click() }
+    overlay.onclick = (e) => { if (e.target === overlay) document.getElementById('popup-name-cancel').click() }
+  }
+  // ===== Gửi ảnh tới ESP32 =====
+  async function sendEnrollToESP32(name, role = "Khách") {
+    if (!capturedBlob) { phoneFaceStatus.textContent = '❌ Không có ảnh'; return }
+    phoneFaceStatus.textContent = '⏳ Đang gửi ảnh tới ESP32 để đăng ký...'
+    phoneCaptureBtn.disabled = true
+
+    try {
+      const resp = await fetch(`${baseHost}/enroll_phone?name=${encodeURIComponent(name)}&role=${encodeURIComponent(role)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: capturedBlob
+      })
+      const result = await resp.json()
+      if (result.status === 'ok') {
+        phoneFaceStatus.textContent = '✅ Đăng ký thành công! ID: ' + result.id + ' - ' + result.name
+        setTimeout(fetchFaces, 1000)
+        capturedBlob = null
+        // Hiện popup RFID
+        showRfidPopup(result.id, result.name || name)
+      } else if (result.status === 'fake') {
+        phoneFaceStatus.textContent = '❌ Anti-spoof: ảnh không hợp lệ. ' + (result.error || '')
+        resetPhoneCapture()
+      } else {
+        phoneFaceStatus.textContent = '❌ Thất bại: ' + (result.error || result.status)
+        resetPhoneCapture()
+      }
+    } catch(e) {
+      console.error('Enroll error:', e)
+      phoneFaceStatus.textContent = '❌ Lỗi kết nối ESP32'
+      resetPhoneCapture()
+    }
+  }
+
+  function resetPhoneCapture() {
+    capturedBlob = null
+    autoCaptured = false
+    faceStableStart = 0
+    phoneCaptureBtn.textContent = '📸 Đang chờ khuôn mặt...'
+    phoneCaptureBtn.disabled = true
+    phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+    restartPhoneDetectionOrManual('Bấm chụp ảnh, ESP32 sẽ kiểm tra khuôn mặt.')
+  }
+
+  // ===== Popup Quét / Nhập RFID =====
+  function showRfidPopup(faceId, faceName) {
+    // Gọi arm_rfid_link để ESP32 sẵn sàng nhận thẻ
+    const overlay = document.createElement('div')
+    overlay.className = 'popup-overlay'
+    overlay.innerHTML = `
+      <div class="popup-card">
+        <h3>💳 Liên kết thẻ RFID</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 6px 0">
+          Khuôn mặt: <b>${faceName}</b> (ID ${faceId})
+        </p>
+        <p style="font-size:13px;color:var(--text);margin:0 0 14px 0">
+          Quét thẻ RFID trên đầu đọc hoặc nhập UID thẻ bên dưới
+        </p>
+        <div id="rfid-scan-status" style="padding:10px;border-radius:10px;background:rgba(14,165,164,0.06);margin-bottom:14px;font-size:13px;font-weight:600;color:var(--accent);text-align:center">
+          ⏳ Đang chờ quét thẻ RFID...
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 8px 0;text-align:center">— hoặc nhập UID thủ công —</p>
+        <input id="rfid-manual-input" type="text" placeholder="VD: 04:A3:2B:1C hoặc A3B21C04"
+               style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(15,23,42,0.15);font-size:14px;margin-bottom:14px;box-sizing:border-box;background:#fbfdff">
+        <button id="rfid-manual-ok" style="background:var(--accent);color:#fff">Lưu UID thủ công</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+
+    const scanStatus = document.getElementById('rfid-scan-status')
+
+    // Poll rfid_state mỗi 1.5s để biết khi nào thẻ được quét
+    let rfidPollInterval = setInterval(async () => {
+      try {
+        const r = await fetch(`${baseHost}/rfid_state`)
+        const data = await r.json()
+        // Khi pending_enroll_face_id = 0 → đã quét xong
+        if (false && data.pending_enroll_face_id === 0) {
+          if (rfidPollInterval) { clearInterval(rfidPollInterval); rfidPollInterval = null }
+          scanStatus.innerHTML = '✅ Đã liên kết thẻ RFID thành công!'
+          scanStatus.style.color = '#10b981'
+          setTimeout(() => { overlay.remove(); fetchFaces() }, 1500)
+        }
+      } catch(e) { /* ignore */ }
+    }, 1500)
+
+    clearInterval(rfidPollInterval)
+    rfidPollInterval = null
+    let rfidFinished = false
+
+    const cancelPendingRfid = () => {
+      if (rfidPollInterval) { clearInterval(rfidPollInterval); rfidPollInterval = null }
+      if (!rfidFinished) fetch(`${baseHost}/cancel_rfid_link`).catch(() => {})
+    }
+
+    const verifyRfidLinked = async () => {
+      const r = await fetch(`${baseHost}/get_faces`)
+      const faces = await r.json()
+      const face = faces.find(f => Number(f.id) === Number(faceId))
+      return !!(face && face.rfid && face.rfid.length >= 4)
+    }
+
+    const showRfidSuccess = () => {
+      rfidFinished = true
+      if (rfidPollInterval) { clearInterval(rfidPollInterval); rfidPollInterval = null }
+      scanStatus.innerHTML = 'Đã liên kết thẻ RFID thành công!'
+      scanStatus.style.color = '#10b981'
+      setTimeout(() => { overlay.remove(); fetchFaces() }, 1000)
+    }
+
+    fetch(`${baseHost}/arm_rfid_link?id=${faceId}`)
+      .then(r => r.text())
+      .then(txt => {
+        if (txt === 'READY') {
+          rfidPollInterval = setInterval(async () => {
+            try {
+              if (await verifyRfidLinked()) {
+                showRfidSuccess()
+              }
+            } catch(e) { /* ignore transient polling errors */ }
+          }, 1500)
+          phoneCaptureBtn.textContent = 'Đăng ký khuôn mặt'
+          phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+        } else {
+          scanStatus.textContent = 'Không sẵn sàng liên kết RFID: ' + txt
+          scanStatus.style.color = '#ef4444'
+        }
+      })
+      .catch(() => {
+        scanStatus.textContent = 'Lỗi kết nối khi khởi tạo liên kết RFID'
+        scanStatus.style.color = '#ef4444'
+      })
+
+    document.getElementById('rfid-manual-ok').onclick = async () => {
+      const uid = document.getElementById('rfid-manual-input').value.trim()
+      if (uid.length < 4) { alert('UID thẻ quá ngắn!'); return }
+      try {
+        scanStatus.textContent = '⏳ Đang lưu UID...'
+        const r = await fetch(`${baseHost}/set_rfid_manual?id=${faceId}&uid=${encodeURIComponent(uid)}`)
+        const txt = await r.text()
+        if (txt === 'OK') {
+          rfidFinished = true
+          if (rfidPollInterval) { clearInterval(rfidPollInterval); rfidPollInterval = null }
+          scanStatus.innerHTML = '✅ Đã lưu UID: ' + uid
+          scanStatus.style.color = '#10b981'
+          setTimeout(() => { overlay.remove(); fetchFaces() }, 1500)
+        } else {
+          scanStatus.textContent = '❌ Lỗi: ' + txt
+        }
+      } catch(e) {
+        scanStatus.textContent = '❌ Lỗi kết nối'
+      }
+    }
+
+    document.getElementById('rfid-manual-input').onkeyup = (e) => {
+      if (e.key === 'Enter') document.getElementById('rfid-manual-ok').click()
+    }
+  }
+
+  // Event handlers for phone camera buttons
+  phoneCaptureBtn.onclick = beginPhoneEnrollFromCurrentFrame
+  phoneCloseBtn.onclick = () => stopPhoneCamera()
+  closePhoneCamBtn.onclick = () => stopPhoneCamera()
+
+  // Show popup on mobile, direct stream on desktop
+  function showCameraPopup() {
+    // Create popup dynamically
+    const overlay = document.createElement('div')
+    overlay.className = 'popup-overlay'
+    overlay.id = 'camera-choice-popup'
+    overlay.innerHTML = `
+      <div class="popup-card">
+        <h3>🎥 Chọn nguồn Camera</h3>
+        <button id="btn-esp32-cam">📷 Camera ESP32 (Thiết bị)</button>
+        <button id="btn-phone-cam">📱 Camera Điện thoại</button>
+        <button class="ghost" id="btn-popup-cancel">Hủy</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    document.getElementById('btn-esp32-cam').onclick = () => { overlay.remove(); startStream() }
+    document.getElementById('btn-phone-cam').onclick = () => { overlay.remove(); startPhoneCamera() }
+    document.getElementById('btn-popup-cancel').onclick = () => overlay.remove()
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+  }
+
+  if (streamButton) {
+    streamButton.onclick = () => {
+      const streamEnabled = streamButton.innerHTML === 'Stop Stream'
+      if (streamEnabled) {
+        stopStream()
+      } else if (phoneCamContainer && !phoneCamContainer.classList.contains('hidden')) {
+        stopPhoneCamera()
+      } else if (isMobileDevice()) {
+        showCameraPopup()
+      } else {
+        startStream()
+      }
+    }
+  }
+
+  function waitEsp32EnrollThenLinkRfid(name) {
+    let pollInterval = setInterval(() => {
+      fetch(`${baseHost}/rfid_state`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.pending_enroll_face_id > 0) {
+            clearInterval(pollInterval)
+            showRfidPopup(data.pending_enroll_face_id, data.pending_enroll_name || name)
+          }
+        })
+        .catch(() => {})
+    }, 1500)
+  }
+
+  function showEnrollSourcePopup() {
+    const overlay = document.createElement('div')
+    overlay.className = 'popup-overlay'
+    overlay.id = 'enroll-choice-popup'
+    overlay.innerHTML = `
+      <div class="popup-card">
+        <h3>✨ Chọn Camera Đăng ký</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px 0">Bạn muốn dùng camera nào để quét khuôn mặt?</p>
+        <button id="btn-enroll-esp32" style="background:#f1f5f9;color:var(--text);border:1px solid #e2e8f0;margin-bottom:8px">📷 Camera ESP32 (Trên thiết bị)</button>
+        <button id="btn-enroll-phone" style="background:var(--accent);color:#fff">📱 Camera Điện thoại</button>
+        <button class="ghost" id="btn-enroll-cancel" style="margin-top:8px">Hủy</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    
+    document.getElementById('btn-enroll-esp32').onclick = () => {
+      overlay.remove()
+      showNamePopup((name, role) => {
+         startStream()
+         fetch(`${baseHost}/enroll?name=${encodeURIComponent(name)}&role=${encodeURIComponent(role)}`)
+           .then(r => r.text())
+           .then(data => {
+              waitEsp32EnrollThenLinkRfid(name);
+           })
+           .catch(err => alert("Lỗi kết nối ESP32!"));
+      })
+    }
+    
+    document.getElementById('btn-enroll-phone').onclick = () => {
+      overlay.remove()
+      startPhoneCamera()
+    }
+    
+    document.getElementById('btn-enroll-cancel').onclick = () => overlay.remove()
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+  }
+
+  enrollButton.onclick = () => {
+    showEnrollSourcePopup();
+  }
+
+  saveButton.onclick = () => {
+    var canvas = document.createElement("canvas");
+    canvas.width = view.width;
+    canvas.height = view.height;
+    document.body.appendChild(canvas);
+    var context = canvas.getContext('2d');
+    context.drawImage(view,0,0);
+    try {
+      var dataURL = canvas.toDataURL('image/jpeg');
+      saveButton.href = dataURL;
+      var d = new Date();
+      saveButton.download = d.getFullYear() + ("0"+(d.getMonth()+1)).slice(-2) + ("0" + d.getDate()).slice(-2) + ("0" + d.getHours()).slice(-2) + ("0" + d.getMinutes()).slice(-2) + ("0" + d.getSeconds()).slice(-2) + ".jpg";
+    } catch (e) {
+      console.error(e);
+    }
+    canvas.parentNode.removeChild(canvas);
+  }
+
+  // Attach default on change action
+  document
+    .querySelectorAll('.default-action')
+    .forEach(el => {
+      el.onchange = () => updateConfig(el)
+    })
+
+  // Custom actions
+  const agc = document.getElementById('agc')
+  const agcGain = document.getElementById('agc_gain-group')
+  const gainCeiling = document.getElementById('gainceiling-group')
+  if (agc) {
+    agc.onchange = () => {
+      updateConfig(agc)
+      if (agc.checked) {
+        show(gainCeiling)
+        hide(agcGain)
+      } else {
+        hide(gainCeiling)
+        show(agcGain)
+      }
+    }
+  }
+
+  // Exposure
+  const aec = document.getElementById('aec')
+  const exposure = document.getElementById('aec_value-group')
+  if (aec) {
+    aec.onchange = () => {
+      updateConfig(aec)
+      aec.checked ? hide(exposure) : show(exposure)
+    }
+  }
+
+  // AWB
+  const awb = document.getElementById('awb_gain')
+  const wb = document.getElementById('wb_mode-group')
+  if (awb) {
+    awb.onchange = () => {
+      updateConfig(awb)
+      awb.checked ? show(wb) : hide(wb)
+    }
+  }
+
+  // Detection and framesize
+  const detect = document.getElementById('face_detect')
+  const recognize = document.getElementById('face_recognize')
+  const framesize = document.getElementById('framesize')
+
+  if (framesize) {
+    framesize.onchange = () => {
+      updateConfig(framesize)
+      if (framesize.value > 5) {
+        if (detect) updateValue(detect, false)
+        if (recognize) updateValue(recognize, false)
+      }
+    }
+  }
+
+  if (detect) {
+    detect.onchange = () => {
+      if (framesize && framesize.value > 5) {
+        alert("Vui lòng chọn độ phân giải CIF hoặc thấp hơn trước khi bật tính năng này!");
+        updateValue(detect, false)
+        return;
+      }
+      updateConfig(detect)
+      if (!detect.checked) {
+        if (enrollButton) disable(enrollButton)
+        if (recognize) updateValue(recognize, false)
+      }
+    }
+  }
+
+  if (recognize) {
+    recognize.onchange = () => {
+      if (framesize && framesize.value > 5) {
+        alert("Vui lòng chọn độ phân giải CIF hoặc thấp hơn trước khi bật tính năng này!");
+        updateValue(recognize, false)
+        return;
+      }
+      updateConfig(recognize)
+      if (recognize.checked) {
+        if (enrollButton) enable(enrollButton)
+        if (detect) updateValue(detect, true)
+      } else {
+        if (enrollButton) disable(enrollButton)
+      }
+    }
+  }
+
+  
+  // Cập nhật thẻ trạng thái thay vì 3D
+  window.setDoorState3D = function(openStatus) {
+      const badge = document.getElementById('door-status-badge');
+      if (!badge) return;
+      if (openStatus) {
+          badge.innerText = 'Trạng thái: 🟢 CỬA MỞ';
+          badge.style.background = '#10b981';
+      } else {
+          badge.innerText = 'Trạng thái: 🔴 CỬA ĐÓNG';
+          badge.style.background = '#ef4444';
+      }
+  }
+
+  // Poll for door status
+  setInterval(() => {
+    fetch(`${document.location.origin}/door_status`)
+      .then(response => response.json())
+      .then(data => {
+        if (data && typeof data.open === 'boolean') {
+           window.setDoorState3D(data.open);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching door status:', err);
+      });
+  }, 1000);
+})
+    </script>
+  </body>
+</html>
